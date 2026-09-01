@@ -36,8 +36,9 @@ export function apply(ctx, config = {}) {
   const resolved = resolveConfig(config)
   // The attachment seam is optional: profiles without it still route the
   // model; image blocks degrade to text placeholders (strict ctx.get, not the
-  // topology-sensitive ctx.<name> proxy).
-  const attachment = typeof ctx.get === 'function' ? ctx.get('attachment') : undefined
+  // topology-sensitive ctx.<name> proxy). The core service is registered as
+  // "attachments" (packages/attachment/attachment/src/index.ts).
+  const attachment = typeof ctx.get === 'function' ? ctx.get('attachments') : undefined
   const adapter = new QwenLocalAdapter({ ...resolved, attachment })
   return ctx.llm.registerAdapter(resolved.provider, adapter)
 }
