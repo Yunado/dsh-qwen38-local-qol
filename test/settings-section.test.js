@@ -48,25 +48,51 @@ test('sectionSchema: partial user layers fill the missing fields', () => {
   assert.equal(resolved.contextWindow, DEFAULT_CONTEXT_WINDOW)
 })
 
-test('sectionSchema: lines carry each dialect production defaults', () => {
+test('sectionSchema: lines carry each dialect production defaults (connection + window numbers)', () => {
   const resolved = sectionSchema()({})
-  assert.deepEqual(resolved.lines.ninfer, { baseURL: DEFAULT_BASE_URL, model: DEFAULT_MODEL, displayName: '' })
-  assert.deepEqual(resolved.lines.llamacpp, { baseURL: DEFAULT_LLAMA_BASE_URL, model: DEFAULT_LLAMA_MODEL, displayName: '' })
+  assert.deepEqual(resolved.lines.ninfer, {
+    baseURL: DEFAULT_BASE_URL,
+    model: DEFAULT_MODEL,
+    displayName: '',
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    maxTokens: DEFAULT_MAX_TOKENS,
+    thinkingBudgets: { ...DEFAULT_THINKING_BUDGETS },
+  })
+  assert.equal(resolved.lines.llamacpp.baseURL, DEFAULT_LLAMA_BASE_URL)
+  assert.equal(resolved.lines.llamacpp.model, DEFAULT_LLAMA_MODEL)
+  assert.equal(resolved.lines.llamacpp.contextWindow, DEFAULT_CONTEXT_WINDOW)
+  assert.equal(resolved.lines.llamacpp.maxTokens, DEFAULT_MAX_TOKENS)
 })
 
 test('sectionSchema: a user-saved line persists over its own defaults', () => {
   const resolved = sectionSchema()({
-    lines: { llamacpp: { baseURL: 'http://127.0.0.1:9999/v1', model: 'some-alias', displayName: 'LLM' } },
+    lines: { llamacpp: { baseURL: 'http://127.0.0.1:9999/v1', model: 'some-alias', displayName: 'LLM', contextWindow: 131072 } },
   })
   assert.equal(resolved.lines.llamacpp.baseURL, 'http://127.0.0.1:9999/v1')
   assert.equal(resolved.lines.llamacpp.model, 'some-alias')
   assert.equal(resolved.lines.llamacpp.displayName, 'LLM')
+  assert.equal(resolved.lines.llamacpp.contextWindow, 131072)
+  assert.equal(resolved.lines.llamacpp.maxTokens, DEFAULT_MAX_TOKENS)
   // The untouched line keeps its defaults.
-  assert.deepEqual(resolved.lines.ninfer, { baseURL: DEFAULT_BASE_URL, model: DEFAULT_MODEL, displayName: '' })
+  assert.equal(resolved.lines.ninfer.contextWindow, DEFAULT_CONTEXT_WINDOW)
 })
 
 test('sectionSchema: a wrong-typed line field is rejected', () => {
   assert.throws(() => sectionSchema()({ lines: { ninfer: { baseURL: 42 } } }))
+  assert.throws(() => sectionSchema()({ lines: { ninfer: { contextWindow: 'wide' } } }))
+})
+
+test('validateSection: a non-positive parked line window fails loud', () => {
+  const value = { ...sectionSchema()({}), lines: { llamacpp: { ...sectionSchema()({}).lines.llamacpp, maxTokens: 0 } } }
+  assert.throws(() => validateSection(value), /lines\.llamacpp\.maxTokens/)
+})
+
+test('validateSection: a non-positive parked line budget fails loud', () => {
+  const value = {
+    ...sectionSchema()({}),
+    lines: { ninfer: { ...sectionSchema()({}).lines.ninfer, thinkingBudgets: { low: 4096, medium: -1, xhigh: 16384 } } },
+  }
+  assert.throws(() => validateSection(value), /lines\.ninfer\.thinkingBudgets\["medium"\]/)
 })
 
 test('sectionSchema: wrong-typed fields are rejected', () => {

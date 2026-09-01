@@ -90,21 +90,33 @@ compaction trim knobs (`summarize.images` / `summarize.keepTurns` /
 concurrent edits.
 
 - **Per-dialect line memory**: the section persists a `lines` block
-  (`lines.ninfer` / `lines.llamacpp`, each a `{baseURL, model, displayName}`)
-  alongside the top-level `baseURL`/`model`/`displayName`, which the tab keeps
-  in sync with the *active* line — those top-level fields are what the adapter
-  reads, so the host side needs no line awareness. Switching the line in the
+  (`lines.ninfer` / `lines.llamacpp`) where each line remembers its own
+  connection (`baseURL` / `model` / `displayName`) **and** its own window
+  numbers (`contextWindow` / `maxTokens` / `thinkingBudgets`). The context
+  window is a property of the line's server build (its `-c`, bounded by that
+  line's VRAM and quantization), not of the model — two lines of the same
+  model may legitimately carry different windows, and a shared window would
+  miscalibrate the compaction threshold of the smaller one. The top-level
+  fields stay the adapter's authority (the tab writes them in sync with the
+  active line), so the host side needs no line awareness; a section saved
+  before `lines` existed is migrated transparently. Switching the line in the
   tab swaps the two remembered lines; switching back restores the previous
-  line's values. A section saved before `lines` existed is migrated
-  transparently (the top level becomes the active line's memory).
-- **Fill-once defaults**: `contextWindow` 229376, `maxTokens` 24576, budgets
-  4096/8192/16384, trim knobs strip/5/2000, and each line's production
-  connection (NInfer 8082 + the 27B NVFP4 artifact id; llama.cpp 8080 + the
-  GGUF basename) are the schema defaults, so a fresh install pre-fills the
-  whole form and only the fields that differ from the defaults need typing.
-  `includeUsage` (default `true`) and `defaultEffort` (default `medium`) are
-  deliberately *not* tab controls — they stay in the schema/config layer
-  (patch row / environment) and are off by design on a dedicated local line.
+  line's values. The compaction trim knobs (`summarize`) stay shared: they
+  describe model behavior, not the line.
+- **Dialect-aware thinking-budget note**: the tab sends
+  `reasoning_budget_tokens` on both dialects, but NInfer ignores it (the
+  effective cap is the server's `--default-thinking-budget` flag) while
+  llama.cpp honors it per request. The hint under the budget fields follows
+  the selected line and says exactly that.
+- **Fill-once defaults**: every window number (229376 / 24576 /
+  4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
+  line's production connection (NInfer 8082 + the 27B NVFP4 artifact id;
+  llama.cpp 8080 + the GGUF basename) are the schema defaults, so a fresh
+  install pre-fills the whole form and only the fields that differ from the
+  defaults need typing. `includeUsage` (default `true`) and `defaultEffort`
+  (default `medium`) are deliberately *not* tab controls — they stay in the
+  schema/config layer (patch row / environment) and are off by design on a
+  dedicated local line.
 - **Persistence** is the settings document (`settings.yaml`, hot-reloaded);
   the write path carries the namespace revision, and a stale write surfaces as
   a conflict (re-read), never a silent overwrite.

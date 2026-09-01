@@ -127,6 +127,10 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   assert.equal(draft.baseURL, 'http://127.0.0.1:8082/v1')
   assert.equal(draft.model, 'qwen3.8-27b-nvfp4-uncensored')
   assert.equal(draft.parkedBaseURL, '')
+  // The parked line's numbers start at the production defaults.
+  assert.equal(draft.parkedContextWindow, '229376')
+  assert.equal(draft.parkedMaxTokens, '24576')
+  assert.equal(draft.parkedXhigh, '16384')
 })
 
 test('toDraft: a new-shape section reads the active line from lines and parks the other', () => {
@@ -136,8 +140,8 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
     model: 'Huihui',
     user: { lines: { ninfer: {}, llamacpp: {} } },
     lines: {
-      ninfer: { baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored', displayName: 'N' },
-      llamacpp: { baseURL: 'http://127.0.0.1:8080/v1', model: 'Huihui', displayName: 'L' },
+      ninfer: { baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored', displayName: 'N', contextWindow: 229376, maxTokens: 24576, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 } },
+      llamacpp: { baseURL: 'http://127.0.0.1:8080/v1', model: 'Huihui', displayName: 'L', contextWindow: 131072, maxTokens: 20480, thinkingBudgets: { low: 2048, medium: 4096, xhigh: 8192 } },
     },
   }
   const draft = client.toDraft(value)
@@ -145,7 +149,17 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.baseURL, 'http://127.0.0.1:8080/v1')
   assert.equal(draft.model, 'Huihui')
   assert.equal(draft.displayName, 'L')
+  // The window numbers follow the line: active = llama line's smaller window.
+  assert.equal(draft.contextWindow, '131072')
+  assert.equal(draft.maxTokens, '20480')
+  assert.equal(draft.low, '2048')
+  assert.equal(draft.medium, '4096')
+  assert.equal(draft.xhigh, '8192')
+  // The parked NInfer line keeps its own numbers.
   assert.equal(draft.parkedBaseURL, 'http://127.0.0.1:8082/v1')
   assert.equal(draft.parkedModel, 'qwen3.8-27b-nvfp4-uncensored')
   assert.equal(draft.parkedDisplayName, 'N')
+  assert.equal(draft.parkedContextWindow, '229376')
+  assert.equal(draft.parkedMaxTokens, '24576')
+  assert.equal(draft.parkedXhigh, '16384')
 })

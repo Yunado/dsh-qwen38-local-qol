@@ -36,7 +36,8 @@ const COPY = {
     contextWindow: 'Context window (tokens)',
     maxTokens: 'Output cap (tokens)',
     thinking: 'Thinking budgets',
-    thinkingHint: 'Hard per-effort thinking-token caps. On NInfer the server ignores the field and its own --default-thinking-budget caps thinking; on llama.cpp each request carries it.',
+    thinkingHintNinfer: 'Hard per-effort thinking-token caps. NInfer receives reasoning_budget_tokens on every request but ignores it — the effective cap is the server\'s --default-thinking-budget flag. On this line the values only define the client-side effort vocabulary.',
+    thinkingHintLlamacpp: 'Hard per-effort thinking-token caps. llama.cpp honors reasoning_budget_tokens per request; the selected level\'s value overrides the server\'s --reasoning-budget flag.',
     compaction: 'Compaction prefill trim',
     summarizeImages: 'Images in the summarizer prefill',
     strip: 'strip to placeholders',
@@ -65,7 +66,8 @@ const COPY = {
     contextWindow: '上下文窗口（token）',
     maxTokens: '输出上限（token）',
     thinking: 'Thinking 预算',
-    thinkingHint: '各 effort 档的 thinking token 硬帽。NInfer 服务端会忽略该字段（实际帽 = 启动参数的 --default-thinking-budget）；llama.cpp 线逐请求携带。',
+    thinkingHintNinfer: '各 effort 档的 thinking token 硬帽。NInfer 每请求都收 reasoning_budget_tokens 但服务端忽略——实际帽 = 启动参数 --default-thinking-budget；这条线上这些值只定义客户端 effort 词汇。',
+    thinkingHintLlamacpp: '各 effort 档的 thinking token 硬帽。llama.cpp 逐请求按所选档携带 reasoning_budget_tokens，覆盖服务端 --reasoning-budget 参数。',
     compaction: '压缩预填充裁剪',
     summarizeImages: '摘要预填充里的图片',
     strip: '替换为占位符',
@@ -133,13 +135,30 @@ export function toDraft(value) {
   const dialect = value.dialect
   const other = dialect === 'ninfer' ? 'llamacpp' : 'ninfer'
   const legacy = (value.user ?? {}).lines === undefined
-  const line = (name) => ({
-    baseURL: value.lines?.[name]?.baseURL ?? '',
-    model: value.lines?.[name]?.model ?? '',
-    displayName: value.lines?.[name]?.displayName ?? '',
-  })
+  const line = (name) => {
+    const raw = value.lines?.[name]
+    return {
+      baseURL: raw?.baseURL ?? '',
+      model: raw?.model ?? '',
+      displayName: raw?.displayName ?? '',
+      contextWindow: String(raw?.contextWindow ?? value.contextWindow ?? 229376),
+      maxTokens: String(raw?.maxTokens ?? value.maxTokens ?? 24576),
+      low: String(raw?.thinkingBudgets?.low ?? value.thinkingBudgets?.low ?? 4096),
+      medium: String(raw?.thinkingBudgets?.medium ?? value.thinkingBudgets?.medium ?? 8192),
+      xhigh: String(raw?.thinkingBudgets?.xhigh ?? value.thinkingBudgets?.xhigh ?? 16384),
+    }
+  }
   const active = legacy
-    ? { baseURL: value.baseURL ?? '', model: value.model ?? '', displayName: value.displayName ?? '' }
+    ? {
+      baseURL: value.baseURL ?? '',
+      model: value.model ?? '',
+      displayName: value.displayName ?? '',
+      contextWindow: String(value.contextWindow ?? 229376),
+      maxTokens: String(value.maxTokens ?? 24576),
+      low: String(value.thinkingBudgets?.low ?? 4096),
+      medium: String(value.thinkingBudgets?.medium ?? 8192),
+      xhigh: String(value.thinkingBudgets?.xhigh ?? 16384),
+    }
     : line(dialect)
   const parked = line(other)
   return {
@@ -147,14 +166,19 @@ export function toDraft(value) {
     baseURL: active.baseURL,
     model: active.model,
     displayName: active.displayName,
+    contextWindow: active.contextWindow,
+    maxTokens: active.maxTokens,
+    low: active.low,
+    medium: active.medium,
+    xhigh: active.xhigh,
     parkedBaseURL: parked.baseURL,
     parkedModel: parked.model,
     parkedDisplayName: parked.displayName,
-    contextWindow: String(value.contextWindow ?? 229376),
-    maxTokens: String(value.maxTokens ?? 24576),
-    low: String(value.thinkingBudgets?.low ?? 4096),
-    medium: String(value.thinkingBudgets?.medium ?? 8192),
-    xhigh: String(value.thinkingBudgets?.xhigh ?? 16384),
+    parkedContextWindow: parked.contextWindow,
+    parkedMaxTokens: parked.maxTokens,
+    parkedLow: parked.low,
+    parkedMedium: parked.medium,
+    parkedXhigh: parked.xhigh,
     images: value.summarize?.images ?? 'strip',
     keepTurns: String(value.summarize?.keepTurns ?? 5),
     toolChars: String(value.summarize?.toolChars ?? 2000),
@@ -185,9 +209,19 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
           baseURL: d.parkedBaseURL,
           model: d.parkedModel,
           displayName: d.parkedDisplayName,
+          contextWindow: d.parkedContextWindow,
+          maxTokens: d.parkedMaxTokens,
+          low: d.parkedLow,
+          medium: d.parkedMedium,
+          xhigh: d.parkedXhigh,
           parkedBaseURL: d.baseURL,
           parkedModel: d.model,
           parkedDisplayName: d.displayName,
+          parkedContextWindow: d.contextWindow,
+          parkedMaxTokens: d.maxTokens,
+          parkedLow: d.low,
+          parkedMedium: d.medium,
+          parkedXhigh: d.xhigh,
         },
       }
     })
@@ -209,24 +243,41 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
 
   const doSave = async () => {
     const { view, draft } = state
-    const numbers = [draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh, draft.keepTurns, draft.toolChars]
+    const numbers = [
+      draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh,
+      draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh,
+      draft.keepTurns, draft.toolChars,
+    ]
     if (numbers.some((text) => /^\d+$/.test(String(text)) === false || Number.parseInt(text, 10) <= 0)) {
       setState((s) => ({ ...s, error: t.invalidNumber }))
       return
     }
     setState((s) => ({ ...s, busy: true, error: null }))
-    // The top-level connection fields are what the adapter reads (the active
-    // line); `lines` persists both lines so switching dialect and back
-    // restores each one's values.
+    // The top-level fields are what the adapter reads (the active line);
+    // `lines` persists both lines — connection AND window numbers (the
+    // context window is a property of the line's server build, not the
+    // model) — so switching dialect and back restores each one's values.
     const otherDialect = draft.dialect === 'ninfer' ? 'llamacpp' : 'ninfer'
+    const lineBlock = (baseURL, model, displayName, contextWindow, maxTokens, low, medium, xhigh) => ({
+      baseURL,
+      model,
+      displayName,
+      contextWindow: Number.parseInt(contextWindow, 10),
+      maxTokens: Number.parseInt(maxTokens, 10),
+      thinkingBudgets: {
+        low: Number.parseInt(low, 10),
+        medium: Number.parseInt(medium, 10),
+        xhigh: Number.parseInt(xhigh, 10),
+      },
+    })
     const patch = {
       dialect: draft.dialect,
       baseURL: draft.baseURL,
       model: draft.model,
       displayName: draft.displayName,
       lines: {
-        [draft.dialect]: { baseURL: draft.baseURL, model: draft.model, displayName: draft.displayName },
-        [otherDialect]: { baseURL: draft.parkedBaseURL, model: draft.parkedModel, displayName: draft.parkedDisplayName },
+        [draft.dialect]: lineBlock(draft.baseURL, draft.model, draft.displayName, draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh),
+        [otherDialect]: lineBlock(draft.parkedBaseURL, draft.parkedModel, draft.parkedDisplayName, draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh),
       },
       contextWindow: Number.parseInt(draft.contextWindow, 10),
       maxTokens: Number.parseInt(draft.maxTokens, 10),
@@ -307,7 +358,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
           ),
         ),
       ),
-      React.createElement('div', { style: { fontSize: 11, opacity: 0.6, marginTop: 4, lineHeight: 1.4 } }, t.thinkingHint),
+      React.createElement('div', { style: { fontSize: 11, opacity: 0.6, marginTop: 4, lineHeight: 1.4 } }, draft.dialect === 'ninfer' ? t.thinkingHintNinfer : t.thinkingHintLlamacpp),
     ),
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.compaction),
