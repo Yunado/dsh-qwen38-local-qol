@@ -104,9 +104,14 @@ concurrent edits.
   line's values. The compaction trim knobs (`summarize`) stay shared: they
   describe model behavior, not the line.
 - **Dialect-aware thinking-budget note**: the tab sends
-  `reasoning_budget_tokens` on both dialects, but NInfer ignores it (the
-  effective cap is the server's `--default-thinking-budget` flag) while
-  llama.cpp honors it per request. The hint under the budget fields follows
+  `reasoning_budget_tokens` on both dialects, but NInfer does not support a
+  per-request thinking budget at all — its OpenAI endpoint has no such field
+  (verified in the engine's source; the cap is the server's
+  `--default-thinking-budget` flag). NInfer is a from-scratch C++/CUDA
+  engine ([Neroued/ninfer](https://github.com/Neroued/ninfer)), not a
+  llama.cpp fork, so the limitation is engine-level, not a build artifact.
+  llama.cpp honors the field per request (the selected level's value
+  overrides `--reasoning-budget`). The hint under the budget fields follows
   the selected line and says exactly that.
 - **Fill-once defaults**: every window number (229376 / 24576 /
   4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
