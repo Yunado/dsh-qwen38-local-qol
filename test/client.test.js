@@ -55,7 +55,7 @@ function fakeCtx(overrides = {}) {
 
 test('client contract: named exports for the function-plugin loader', () => {
   assert.equal(client.name, 'qwen38-local-qol')
-  assert.deepEqual(client.inject, ['slots', 'locale'])
+  assert.deepEqual(client.inject, ['slots', 'locale', 'remote'])
   assert.equal(typeof client.apply, 'function')
 })
 

@@ -155,6 +155,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       if (!alive) return
       if (result.ok) setState({ status: 'ready', error: null, view: result.value, draft: toDraft(result.value.value), busy: false, saved: false })
       else setState({ status: 'error', error: result.ok === false && result.error === 'ns-missing' ? t.notFound : result.error, view: null, draft: null, busy: false, saved: false })
+    }).catch((error) => {
+      if (!alive) return
+      setState({ status: 'error', error: t.remoteError + (error instanceof Error ? error.message : String(error)), view: null, draft: null, busy: false, saved: false })
     })
     return () => { alive = false }
     // The page mounts once; reloads happen through explicit actions.
@@ -330,5 +333,5 @@ export function apply(ctx) {
 /** Plugin name, mirroring the host half. */
 export const name = 'qwen38-local-qol'
 
-/** Hard client dependencies. */
-export const inject = ['slots', 'locale']
+/** Hard client dependencies. `remote` is a Cordis client service — the settings page reads and writes through it, and an undeclared service is absent from the plugin's ctx. */
+export const inject = ['slots', 'locale', 'remote']
