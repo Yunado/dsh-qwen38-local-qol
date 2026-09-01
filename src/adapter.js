@@ -49,7 +49,6 @@ const LLMACPP_IMAGE_TOKEN_CAP = 1536
  * code rather than an empty stream.
  */
 export class QwenLocalAdapter extends LlmAdapter {
-  #attachment
   #configSource
   #fetch
 
@@ -73,9 +72,7 @@ export class QwenLocalAdapter extends LlmAdapter {
   constructor(config = {}) {
     super()
     this.#configSource = typeof config === 'function' ? config : () => config
-    const initial = this.#configSource()
-    this.#attachment = initial.attachment
-    this.#fetch = initial.fetch ?? globalThis.fetch
+    this.#fetch = this.#configSource().fetch ?? globalThis.fetch
   }
 
   /** The live resolved configuration (settings section value when installed). */
@@ -97,6 +94,17 @@ export class QwenLocalAdapter extends LlmAdapter {
 
   get #apiKey() {
     return this.#config.apiKey || undefined
+  }
+
+  /**
+   * The optional attachment store, read live: the plugin supplies it through
+   * a `ctx.inject` child fiber whose callback can run after this adapter is
+   * constructed, so a construction-time capture would lock in `undefined`
+   * forever. `undefined` where the profile has no store: image blocks then
+   * degrade to text placeholders.
+   */
+  get #attachment() {
+    return this.#configSource().attachment
   }
 
   /** The chat-completions endpoint this adapter posts to. */

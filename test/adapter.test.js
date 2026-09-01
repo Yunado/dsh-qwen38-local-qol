@@ -218,6 +218,36 @@ test('stream: user image blocks resolve to image_url data URLs through the attac
   assert.ok(userMessage.content.some((entry) => entry.type === 'text' && entry.text === 'look'))
 })
 
+test('stream: the attachment seam resolves live when the store arrives after construction', async () => {
+  const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 57])
+  const ref = { attachmentId: 'att-late', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'late.png' }
+  // The settings seam supplies the store through a `ctx.inject` child fiber
+  // whose callback runs after the adapter is constructed; the source closure
+  // flips over only once the service is ready.
+  let attachment
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+    'data: [DONE]\n\n',
+  ]
+  const { fetch, requests } = fakeFetch(sseResponse(frames))
+  const adapter = new QwenLocalAdapter(() => ({ ...CONFIG, attachment, fetch }))
+  // The store arrives after construction: a construction-time capture would
+  // see `undefined` and degrade the image to a placeholder.
+  attachment = { readImage: async () => ({ ref, data: pngBytes }) }
+  const imageOptions = {
+    ...options(),
+    messages: [{ role: 'user', content: [{ type: 'image', attachment: ref }] }],
+  }
+  const chunks = []
+  for await (const chunk of adapter.stream(imageOptions)) chunks.push(chunk)
+  assert.equal(chunks.at(-1).type, 'finish')
+  const sent = JSON.parse(requests[0].init.body)
+  const userMessage = sent.messages.find((message) => message.role === 'user')
+  const imageEntry = userMessage.content.find((entry) => entry.type === 'image_url')
+  assert.deepEqual(imageEntry, { type: 'image_url', image_url: { url: `data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}` } })
+})
+
 test('stream: an unreadable image degrades to the placeholder, the request still goes out', async () => {
   const ref = { attachmentId: 'att-2', mediaType: 'image/png', bytes: 4, width: 1, height: 1, name: 'gone.png' }
   const attachment = { readImage: async () => { throw new Error('store churn') } }
