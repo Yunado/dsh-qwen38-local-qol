@@ -58,6 +58,7 @@ fields the patch leaves out):
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | declared context capacity (pressure compaction requires it) |
 | `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | declared per-request output cap |
 | `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | per-effort hard thinking budgets; the declared effort vocabulary is `off` + these keys |
+| `defaultEffort` | `DSH_QWEN38_DEFAULT_EFFORT` | `medium` | effort materialized into requests that omit one; must be `off` or a `thinkingBudgets` key. Declaring it (any value) suppresses the core selector's "Default" row, which is redundant with `off` on this line |
 | `thinkingLevelMap` | — | identity | effort id → wire effort name |
 | `includeUsage` | — | `true` for `llamacpp`, `false` for `ninfer` | request `stream_options.include_usage` |
 | `provider` | — | `["qwen38"]` | the provider route(s) to register |

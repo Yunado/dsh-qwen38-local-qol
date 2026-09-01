@@ -16,3 +16,4 @@
           low: 4096
           medium: 8192
           xhigh: 16384
+        defaultEffort: medium

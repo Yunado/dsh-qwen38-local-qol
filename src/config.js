@@ -106,6 +106,14 @@ export function resolveConfig(config = {}, env = process.env) {
     ? config.provider.map((route) => String(route).trim()).filter((route) => route !== '')
     : [DEFAULT_PROVIDER]
 
+  const contextWindow = intSetting(config.contextWindow, env.DSH_QWEN38_CONTEXT_WINDOW, DEFAULT_CONTEXT_WINDOW)
+  const maxTokens = intSetting(config.maxTokens, env.DSH_QWEN38_MAX_TOKENS, DEFAULT_MAX_TOKENS)
+  const thinkingBudgets = budgetMap(config.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
+  const defaultEffort = setting(config.defaultEffort, env.DSH_QWEN38_DEFAULT_EFFORT, 'medium')
+  if (defaultEffort !== 'off' && thinkingBudgets[defaultEffort] === undefined) {
+    throw new Error(`dsh-qwen38-local-qol: defaultEffort "${defaultEffort}" is not a declared effort ("off" + thinkingBudgets keys)`)
+  }
+
   return {
     baseURL: setting(config.baseURL, env.DSH_QWEN38_BASE_URL, DEFAULT_BASE_URL),
     model: setting(config.model, env.DSH_QWEN38_MODEL, DEFAULT_MODEL),
@@ -117,9 +125,15 @@ export function resolveConfig(config = {}, env = process.env) {
     displayName: setting(config.displayName, env.DSH_QWEN38_DISPLAY_NAME, undefined),
     apiKey: setting(config.apiKey, env.DSH_QWEN38_API_KEY, undefined),
     dialect,
-    contextWindow: intSetting(config.contextWindow, env.DSH_QWEN38_CONTEXT_WINDOW, DEFAULT_CONTEXT_WINDOW),
-    maxTokens: intSetting(config.maxTokens, env.DSH_QWEN38_MAX_TOKENS, DEFAULT_MAX_TOKENS),
-    thinkingBudgets: budgetMap(config.thinkingBudgets, DEFAULT_THINKING_BUDGETS),
+    contextWindow,
+    maxTokens,
+    thinkingBudgets,
+    /**
+     * The selectable effort materialized into requests that omit one, and the
+     * selector fallback. Declaring it suppresses the core selector's
+     * "Default" row (which is redundant with `off` on this line).
+     */
+    defaultEffort,
     thinkingLevelMap: config.thinkingLevelMap && typeof config.thinkingLevelMap === 'object'
       ? Object.fromEntries(Object.entries(config.thinkingLevelMap).filter((entry) => typeof entry[1] === 'string'))
       : {},

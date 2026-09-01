@@ -49,12 +49,24 @@ test('resolveConfig: displayName resolves row over env and stays unset without e
   assert.equal(resolveConfig({}, {}).displayName, undefined)
 })
 
+test('resolveConfig: defaultEffort defaults to medium, row beats env, invalid effort fails loud', () => {
+  const env = { DSH_QWEN38_DEFAULT_EFFORT: 'low' }
+  assert.equal(resolveConfig({}, env).defaultEffort, 'low')
+  assert.equal(resolveConfig({ defaultEffort: 'xhigh' }, env).defaultEffort, 'xhigh')
+  assert.equal(resolveConfig({}, {}).defaultEffort, 'medium')
+  assert.throws(() => resolveConfig({ defaultEffort: 'max' }, {}), /defaultEffort "max" is not a declared effort/)
+  assert.equal(resolveConfig({ defaultEffort: 'off' }, {}).defaultEffort, 'off')
+})
+
 test('resolveConfig: invalid dialect fails loud', () => {
   assert.throws(() => resolveConfig({ dialect: 'vllm' }, {}), /dialect must be/)
 })
 
 test('resolveConfig: budget map drops malformed entries, falls back when all drop', () => {
-  assert.deepEqual(resolveConfig({ thinkingBudgets: { low: 100, medium: 'x', xhigh: -3 } }, {}).thinkingBudgets, { low: 100 })
+  // The default defaultEffort (medium) must be a declared effort, so the
+  // partial-budget case names one explicitly; an all-drop map keeps the
+  // built-in budgets, where medium is declared.
+  assert.deepEqual(resolveConfig({ thinkingBudgets: { low: 100, medium: 'x', xhigh: -3 }, defaultEffort: 'low' }, {}).thinkingBudgets, { low: 100 })
   assert.deepEqual(resolveConfig({ thinkingBudgets: { low: 'x' } }, {}).thinkingBudgets, DEFAULT_THINKING_BUDGETS)
 })
 

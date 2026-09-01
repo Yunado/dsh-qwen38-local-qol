@@ -16,6 +16,7 @@ const CONFIG = {
   thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 },
   thinkingLevelMap: {},
   includeUsage: false,
+  defaultEffort: 'medium',
 }
 
 const encoder = new TextEncoder()
@@ -251,6 +252,13 @@ test('resolveModel: context capacity and the effort vocabulary with budgets', as
   assert.deepEqual(ids, ['off', 'low', 'medium', 'xhigh'])
   const medium = info.reasoning.efforts.find((effort) => effort.id === 'medium')
   assert.equal(medium.budgetTokens, 8192)
+  assert.equal(info.reasoning.defaultEffort, 'medium')
+})
+
+test('resolveModel: an undeclared defaultEffort leaves the selector Default row in place', async () => {
+  const adapter = new QwenLocalAdapter({ ...CONFIG, defaultEffort: undefined })
+  const info = await adapter.resolveModel('qwen38', 'qwen')
+  assert.equal(info.reasoning.defaultEffort, undefined)
 })
 
 test('listModels: the configured model with text+image input modalities', async () => {

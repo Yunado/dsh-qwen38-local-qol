@@ -130,7 +130,10 @@ export class QwenLocalAdapter extends LlmAdapter {
       name: model,
       context: { contextWindow: this.#config.contextWindow },
       defaultMaxTokens: this.#config.maxTokens,
-      reasoning: { efforts },
+      // Declaring the default suppresses the selector's built-in "Default"
+      // row, which on this line is redundant with `off`; undeclared requests
+      // materialize the default instead of hitting the server default.
+      reasoning: { efforts, defaultEffort: this.#config.defaultEffort },
     }
   }
 
