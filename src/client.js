@@ -333,5 +333,5 @@ export function apply(ctx) {
 /** Plugin name, mirroring the host half. */
 export const name = 'qwen38-local-qol'
 
-/** Hard client dependencies. `remote` is a Cordis client service — the settings page reads and writes through it, and an undeclared service is absent from the plugin's ctx. */
-export const inject = ['slots', 'locale', 'remote']
+/** Hard client dependencies. `remote` and the dotted `remote.settings` are Cordis client services — the gateway provides each Remote namespace under its dotted name, and the ctx proxy resolves `ctx.remote.settings` against that one; an undeclared service is absent from the plugin's ctx. */
+export const inject = ['slots', 'locale', 'remote', 'remote.settings']

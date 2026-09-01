@@ -29,7 +29,7 @@ test('built bundle: self-registers the package id and returns the plugin face', 
     return React
   })
   assert.equal(face.name, 'qwen38-local-qol')
-  assert.deepEqual(face.inject, ['slots', 'locale', 'remote'])
+  assert.deepEqual(face.inject, ['slots', 'locale', 'remote', 'remote.settings'])
   assert.equal(typeof face.apply, 'function')
 })
 
