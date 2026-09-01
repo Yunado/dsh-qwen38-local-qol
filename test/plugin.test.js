@@ -6,6 +6,28 @@ import assert from 'node:assert/strict'
 import * as plugin from '../src/index.js'
 import { QwenLocalAdapter } from '../src/adapter.js'
 
+/**
+ * Fake plugin ctx whose `inject` mimics the cordis child-fiber semantics the
+ * host uses: the callback runs eagerly with a face exposing the requested
+ * services, and stays pending (no callback) when any requested service is
+ * absent from `services` — the optional-service behavior the real runtime
+ * provides (the session-query `_optionalPersistenceFiber` precedent).
+ */
+function makeTestCtx(services = {}, llm = {}) {
+  return {
+    inject(names, callback) {
+      const face = {}
+      for (const name of names) {
+        if (!Object.hasOwn(services, name)) return {}
+        face[name] = services[name]
+      }
+      callback(face)
+      return {}
+    },
+    llm,
+  }
+}
+
 test('plugin contract: named exports, no default export', () => {
   assert.equal(plugin.name, 'qwen38-local-qol')
   assert.deepEqual(plugin.inject, ['llm'])
@@ -16,29 +38,24 @@ test('plugin contract: named exports, no default export', () => {
 test('apply: installs the user-settings section; the adapter reads the live resolved value', async () => {
   let registered = null
   let installCalls = []
-  const ctx = {
-    get: (name) => {
-      if (name !== 'settings') return undefined
-      return {
-        installSection(_owner, ns, _schema, entry, hooks) {
-          let value = entry
-          installCalls.push({
-            ns,
-            entry,
-            setValue: (next) => { value = next },
-          })
-          hooks.setSource(() => value)
-          return () => {}
-        },
-      }
-    },
-    llm: {
-      registerAdapter(_routes, adapter) {
-        registered = adapter
-        return () => {}
-      },
+  const settingsService = {
+    installSection(_owner, ns, _schema, entry, hooks) {
+      let value = entry
+      installCalls.push({
+        ns,
+        entry,
+        setValue: (next) => { value = next },
+      })
+      hooks.setSource(() => value)
+      return () => {}
     },
   }
+  const ctx = makeTestCtx({ settings: settingsService }, {
+    registerAdapter(_routes, adapter) {
+      registered = adapter
+      return () => {}
+    },
+  })
   const frames = [
     'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
@@ -102,15 +119,13 @@ test('apply: installs the user-settings section; the adapter reads the live reso
 
 test('apply: registers the configured routes with a QwenLocalAdapter and returns the handle', () => {
   let registered = null
-  const ctx = {
-    llm: {
-      registerAdapter(routes, adapter) {
-        registered = { routes, adapter }
-        const handle = () => { handle.released = true }
-        return handle
-      },
+  const ctx = makeTestCtx({}, {
+    registerAdapter(routes, adapter) {
+      registered = { routes, adapter }
+      const handle = () => { handle.released = true }
+      return handle
     },
-  }
+  })
   const handle = plugin.apply(ctx, { baseURL: 'http://a/v1', provider: ['qwen38', 'qwen38-2'] })
   assert.deepEqual(registered.routes, ['qwen38', 'qwen38-2'])
   assert.ok(registered.adapter instanceof QwenLocalAdapter)
@@ -121,14 +136,12 @@ test('apply: registers the configured routes with a QwenLocalAdapter and returns
 
 test('apply: default config registers the single default route', () => {
   let registered = null
-  const ctx = {
-    llm: {
-      registerAdapter(routes, adapter) {
-        registered = routes
-        return () => {}
-      },
+  const ctx = makeTestCtx({}, {
+    registerAdapter(routes, adapter) {
+      registered = routes
+      return () => {}
     },
-  }
+  })
   plugin.apply(ctx, {})
   assert.deepEqual(registered, ['qwen38'])
 })
@@ -139,15 +152,12 @@ test('apply: injects the core "attachments" service (plural) so image blocks rea
   const readImageCalls = []
   const attachmentService = { readImage: async (value) => { readImageCalls.push(value); return { ref, data: pngBytes } } }
   let registered = null
-  const ctx = {
-    get: (name) => (name === 'attachments' ? attachmentService : undefined),
-    llm: {
-      registerAdapter(_routes, adapter) {
-        registered = adapter
-        return () => {}
-      },
+  const ctx = makeTestCtx({ attachments: attachmentService }, {
+    registerAdapter(_routes, adapter) {
+      registered = adapter
+      return () => {}
     },
-  }
+  })
   const frames = [
     'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
