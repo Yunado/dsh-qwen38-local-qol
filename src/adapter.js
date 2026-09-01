@@ -130,6 +130,10 @@ export class QwenLocalAdapter extends LlmAdapter {
       name: model,
       context: { contextWindow: this.#config.contextWindow },
       defaultMaxTokens: this.#config.maxTokens,
+      // Both local Qwen lines are vision-capable (NInfer --vision; the llama
+      // line ships an mmproj), and the image-capability gate resolves this
+      // method — not listModels — so the modalities must be declared here too.
+      inputModalities: ['text', 'image'],
       // Declaring the default suppresses the selector's built-in "Default"
       // row, which on this line is redundant with `off`; undeclared requests
       // materialize the default instead of hitting the server default.

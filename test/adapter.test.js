@@ -248,6 +248,7 @@ test('resolveModel: context capacity and the effort vocabulary with budgets', as
   assert.equal(info.id, 'qwen')
   assert.deepEqual(info.context, { contextWindow: 229376 })
   assert.equal(info.defaultMaxTokens, 24576)
+  assert.deepEqual(info.inputModalities, ['text', 'image'])
   const ids = info.reasoning.efforts.map((effort) => effort.id)
   assert.deepEqual(ids, ['off', 'low', 'medium', 'xhigh'])
   const medium = info.reasoning.efforts.find((effort) => effort.id === 'medium')
