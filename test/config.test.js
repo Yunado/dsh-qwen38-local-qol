@@ -42,6 +42,13 @@ test('resolveConfig: empty strings count as unset; llamacpp default includeUsage
   assert.equal(resolved.includeUsage, true)
 })
 
+test('resolveConfig: displayName resolves row over env and stays unset without either', () => {
+  const env = { DSH_QWEN38_DISPLAY_NAME: 'Env Name' }
+  assert.equal(resolveConfig({}, env).displayName, 'Env Name')
+  assert.equal(resolveConfig({ displayName: 'Row Name' }, env).displayName, 'Row Name')
+  assert.equal(resolveConfig({}, {}).displayName, undefined)
+})
+
 test('resolveConfig: invalid dialect fails loud', () => {
   assert.throws(() => resolveConfig({ dialect: 'vllm' }, {}), /dialect must be/)
 })

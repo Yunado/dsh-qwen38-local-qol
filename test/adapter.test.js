@@ -259,6 +259,13 @@ test('listModels: the configured model with text+image input modalities', async 
     [{ provider: 'qwen38', id: 'qwen', name: 'qwen', inputModalities: ['text', 'image'] }])
 })
 
+test('listModels: the display name separates the selector label from the wire id', async () => {
+  const adapter = new QwenLocalAdapter({ ...CONFIG, displayName: 'Qwen3.8-27B' })
+  const models = await adapter.listModels('qwen38')
+  assert.equal(models[0].id, 'qwen')
+  assert.equal(models[0].name, 'Qwen3.8-27B')
+})
+
 test('imageRequestPricing: the NInfer patch formula per occurrence, empty priced text', () => {
   const adapter = new QwenLocalAdapter(CONFIG)
   const images = [

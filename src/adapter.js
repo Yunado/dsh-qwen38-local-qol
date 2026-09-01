@@ -51,6 +51,7 @@ const LLMACPP_IMAGE_TOKEN_CAP = 1536
 export class QwenLocalAdapter extends LlmAdapter {
   #baseURL
   #model
+  #displayName
   #apiKey
   #attachment
   #config
@@ -60,6 +61,7 @@ export class QwenLocalAdapter extends LlmAdapter {
    * @param config - resolved configuration from `resolveConfig()` (or a test double).
    * @param config.baseURL - server base URL, including `/v1`.
    * @param config.model - model id to send when a request omits one.
+   * @param config.displayName - selector name shown in the GUI; falls back to the model id.
    * @param config.apiKey - optional server `--api-key` credential.
    * @param config.dialect - `ninfer` or `llamacpp`; selects the thinking wire.
    * @param config.contextWindow - declared context capacity for pressure compaction.
@@ -74,6 +76,7 @@ export class QwenLocalAdapter extends LlmAdapter {
     super()
     this.#baseURL = config.baseURL
     this.#model = config.model
+    this.#displayName = config.displayName ?? config.model
     this.#apiKey = config.apiKey
     this.#attachment = config.attachment
     this.#config = config
@@ -96,12 +99,14 @@ export class QwenLocalAdapter extends LlmAdapter {
   /**
    * Advertise the configured model. The local server serves whatever weights
    * it was started with, named by its alias; the catalog is advisory, so an
-   * unlisted id passed by the caller is still forwarded.
+   * unlisted id passed by the caller is still forwarded. The selector name is
+   * the configured display name (the wire id is an artifact alias) or the
+   * model id when no display name is configured.
    * @param provider - a provider route owned by this adapter.
    * @returns the single configured model entry.
    */
   async listModels(provider) {
-    return [{ provider, id: this.#model, name: this.#model, inputModalities: ['text', 'image'] }]
+    return [{ provider, id: this.#model, name: this.#displayName, inputModalities: ['text', 'image'] }]
   }
 
   /**

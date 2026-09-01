@@ -109,6 +109,12 @@ export function resolveConfig(config = {}, env = process.env) {
   return {
     baseURL: setting(config.baseURL, env.DSH_QWEN38_BASE_URL, DEFAULT_BASE_URL),
     model: setting(config.model, env.DSH_QWEN38_MODEL, DEFAULT_MODEL),
+    /**
+     * Human-readable selector name for the model entry. The wire model id is
+     * an artifact alias (e.g. `qwen3.8-27b-nvfp4-uncensored`); the display
+     * name is what the GUI selector shows. Unset falls back to the model id.
+     */
+    displayName: setting(config.displayName, env.DSH_QWEN38_DISPLAY_NAME, undefined),
     apiKey: setting(config.apiKey, env.DSH_QWEN38_API_KEY, undefined),
     dialect,
     contextWindow: intSetting(config.contextWindow, env.DSH_QWEN38_CONTEXT_WINDOW, DEFAULT_CONTEXT_WINDOW),

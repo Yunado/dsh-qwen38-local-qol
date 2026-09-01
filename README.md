@@ -52,6 +52,7 @@ fields the patch leaves out):
 |---|---|---|---|
 | `baseURL` | `DSH_QWEN38_BASE_URL` | `http://127.0.0.1:8082/v1` | server base, including `/v1` |
 | `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | model id sent when a request omits one (the NInfer 0.5.0 artifact id; the llama.cpp line serves its own id — set this field or the env there) |
+| `displayName` | `DSH_QWEN38_DISPLAY_NAME` | the model id | human-readable name for the GUI model selector (the wire id is an artifact alias) |
 | `apiKey` | `DSH_QWEN38_API_KEY` | — | server `--api-key`, when set |
 | `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` or `llamacpp` (the thinking wire) |
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | declared context capacity (pressure compaction requires it) |
