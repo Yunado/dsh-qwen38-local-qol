@@ -138,13 +138,16 @@ export function resolveConfig(config = {}, env = process.env) {
       ? Object.fromEntries(Object.entries(config.thinkingLevelMap).filter((entry) => typeof entry[1] === 'string'))
       : {},
     /**
-     * Ask the server to report usage in the final stream frame. Default per
-     * dialect: llama-server honors `stream_options.include_usage`; the NInfer
-     * 0.5.0 OpenAI parser is not verified to accept it, so it stays off.
+     * Ask the server to report usage in the final stream frame. On by default
+     * for both dialects: the context-pressure projection (the session's
+     * context meter) and the per-turn reasoning-token display both read the
+     * server-reported usage. Verified 2026-09 against NInfer 0.5.0 (accepts
+     * `stream_options.include_usage` and reports `usage`, including
+     * `completion_tokens_details.reasoning_tokens`); llama-server honors it.
      */
     includeUsage: typeof config.includeUsage === 'boolean'
       ? config.includeUsage
-      : dialect === DIALECT_LLAMACPP,
+      : true,
     provider: provider.length > 0 ? provider : [DEFAULT_PROVIDER],
   }
 }

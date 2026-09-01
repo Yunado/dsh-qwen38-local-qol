@@ -15,8 +15,9 @@ test('resolveConfig: built-in defaults match the production line', () => {
   assert.equal(resolved.maxTokens, 24576)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
   assert.deepEqual(resolved.provider, ['qwen38'])
-  // Usage reporting is conservative per dialect.
-  assert.equal(resolved.includeUsage, false)
+  // Usage reporting is on by default for both dialects: NInfer 0.5.0 and
+  // llama-server both honor stream_options.include_usage (verified 2026-09).
+  assert.equal(resolved.includeUsage, true)
 })
 
 test('resolveConfig: patch row beats environment, environment beats default', () => {
@@ -40,6 +41,11 @@ test('resolveConfig: empty strings count as unset; llamacpp default includeUsage
   const resolved = resolveConfig({ baseURL: '   ', dialect: 'llamacpp' }, {})
   assert.equal(resolved.baseURL, DEFAULT_BASE_URL)
   assert.equal(resolved.includeUsage, true)
+})
+
+test('resolveConfig: includeUsage is explicit-only, both dialects default on', () => {
+  assert.equal(resolveConfig({ includeUsage: false }, {}).includeUsage, false)
+  assert.equal(resolveConfig({ includeUsage: true, dialect: 'llamacpp' }, {}).includeUsage, true)
 })
 
 test('resolveConfig: displayName resolves row over env and stays unset without either', () => {
