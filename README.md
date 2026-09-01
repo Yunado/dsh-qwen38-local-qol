@@ -97,6 +97,14 @@ revision indicator and conflict handling for concurrent edits.
   row / environment → built-in defaults. Without the settings provider
   (headless profiles) the row/environment/default chain from the table above
   still governs, and the trim knobs fall back to the environment variables.
+- **Registration is a declared injection, not a store read**: the apply body
+  uses `ctx.inject(['settings'], …)` (and `ctx.inject(['attachments'], …)`)
+  instead of `ctx.get(…)`. A store read at apply time races the boot order —
+  when this plugin's apply ran before the settings provider registered its
+  service, the section silently never installed and the settings surface had
+  no namespace to write (the llm-pi-ai / tool-fs / agent-loop precedent is the
+  declared-injection form; absent optional services keep the child fiber
+  pending rather than failing it).
 
 ## Wire map
 
