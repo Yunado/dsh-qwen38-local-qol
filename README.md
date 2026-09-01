@@ -128,16 +128,20 @@ Both dialects speak OpenAI-compatible `/v1/chat/completions` with:
 
 ```sh
 pnpm install
-pnpm test          # node --test
+pnpm test              # node --test (host + client + built artifact)
+pnpm run build:client  # re-build lib/client.js after editing src/client.js
 ```
 
-Raw ESM JavaScript with JSDoc (the dsh-llamacpp shipping pattern); no build
-step — the browser half (`./client`) is `React.createElement` for the same
-reason. Peer pins: `@deepseek-ai/cordis ^4.0.1`, `@deepseek-ai/dsh-llm
-^0.1.1-rc.2` (verified against the npm 0.1.1-rc.2 line; developed and
-machine-verified on the 0.1.2-alpha.3 source tree), plus
-`@deepseek-ai/schemastery ^3.18.1` and `react ^18.2.0` for the settings
-section.
+Raw ESM JavaScript with JSDoc for the host half (the dsh-llamacpp shipping
+pattern). The browser half (`src/client.js`) is `React.createElement` source,
+built by `scripts/build-client.mjs` (esbuild, `react` external) into the DSH
+client-module format — a self-registering script the web loader executes as a
+classic script — and shipped as the committed `lib/client.js`. Rebuild and
+commit after any `src/client.js` change. Peer pins: `@deepseek-ai/cordis
+^4.0.1`, `@deepseek-ai/dsh-llm ^0.1.1-rc.2` (verified against the npm
+0.1.1-rc.2 line; developed and machine-verified on the 0.1.2-alpha.3 source
+tree), plus `@deepseek-ai/schemastery ^3.18.1` and `react ^18.2.0` for the
+settings section.
 
 ## Known Limitations and Deferred Work
 

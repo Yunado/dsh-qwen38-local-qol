@@ -8,8 +8,10 @@
  * back so a concurrent editor (the settings document on disk, another
  * browser) is surfaced as a conflict and re-read, never silently overwritten.
  *
- * Raw ESM on purpose: the plugin ships no build step, so the component is
- * `React.createElement` and the styling is inline. The dialect selector is
+ * The source is `React.createElement` (no JSX) and is built by
+ * `scripts/build-client.mjs` (esbuild, `react` external) into the DSH
+ * client-module format — a self-registering classic script — committed as
+ * `lib/client.js`. The styling is inline for the same reason. The dialect selector is
  * the headline control — it switches the thinking wire (NInfer vs
  * llama-server) for every request the plugin route serves.
  *
