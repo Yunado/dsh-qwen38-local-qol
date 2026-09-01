@@ -26,8 +26,14 @@ export const USER_PRESET_DIR = '.agent-presets'
 export const PRESET_ID = 'qwen38-qol'
 /** The backend row id inside the preset's compaction group. */
 export const BACKEND_ROW_ID = 'compaction-basic'
-/** The package this backend row must name. */
-export const BACKEND_PACKAGE = 'dsh-qwen38-local-qol'
+/**
+ * The package this backend row must name. The row targets the `./backend`
+ * subpath, not the package root: the root entry is the function plugin (the
+ * provider route registration), while the compaction row needs the package's
+ * default-exported service class, which the exports map publishes under
+ * `./backend`.
+ */
+export const BACKEND_PACKAGE = 'dsh-qwen38-local-qol/backend'
 /** The stock config value pinned on the backend row (the 8192 default is the cap thinking used to eat). */
 export const BACKEND_MAX_TOKENS = 16384
 

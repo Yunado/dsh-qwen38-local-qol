@@ -35,7 +35,7 @@ export class QwenLocalCompaction extends BasicCompactionEngine {
    * @param signal - optional cancellation forwarded to the adapter.
    * @returns safe text summary blocks and the exact auxiliary call envelope and output.
    */
-  protected async summarize(input, agent, signal) {
+  async summarize(input, agent, signal) {
     const knobs = resolveTrimKnobs(process.env)
     const prepared = prepareSummaryRegion(input.messages, knobs)
     return super.summarize({ ...input, messages: prepared }, agent, signal)
