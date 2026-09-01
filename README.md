@@ -22,12 +22,13 @@ Qwen line needs:
    results capped) and the one-shot call keeps thinking off — the checkpoint
    gets the whole output cap instead of a truncated "incomplete checkpoint".
 
-One package, two registrations:
+One package, three registrations:
 
 | Registration | Seam | Mount |
 |---|---|---|
 | `QwenLocalAdapter` (provider route `qwen38`) | `ctx.llm.registerAdapter()` | the bundle patch (`cordis.patch.yml`) on the profile root |
 | `QwenLocalCompaction` (compaction backend) | subclass of `@deepseek-ai/dsh-compaction-basic` | the generated **user preset** `~/.dsh/.agent-presets/qwen38-qol/agent.cordis.yml` (the per-session agent preset owns the isolated compaction group; profile-level patches do not reach it) |
+| settings tab (**Qwen3.8 Local**) | user-settings namespace `qwen38-local-qol` + the browser `settings.section` slot | the settings provider's `installSection` (host) and the plugin's `dsh.client` manifest (browser, the `./client` export) |
 
 ## Install
 
@@ -75,6 +76,28 @@ stock config schema does not know):
 The generated preset pins the backend row's `maxTokens` to `16384` (the stock
 8192 default is the cap thinking used to eat before this backend existed).
 
+## Settings tab
+
+On a profile with the settings provider (the web surface), the plugin registers
+the user-settings namespace `qwen38-local-qol` and a **Qwen3.8 Local** page in
+the settings dialog. The tab exposes the full provider config — the server
+line selector (NInfer vs llama.cpp, i.e. the `dialect` field), `baseURL`,
+`model`, `displayName`, `contextWindow`, `maxTokens`, `includeUsage`, the
+per-effort `thinkingBudgets`, `defaultEffort`, and the compaction trim knobs
+(`summarize.images` / `summarize.keepTurns` / `summarize.toolChars`) — plus a
+revision indicator and conflict handling for concurrent edits.
+
+- **Persistence** is the settings document (`settings.yaml`, hot-reloaded);
+  the write path carries the namespace revision, and a stale write surfaces as
+  a conflict (re-read), never a silent overwrite.
+- **Effect is live, no restart**: the adapter reads the resolved value per
+  request and the compaction backend per summarize call, so a saved change
+  applies on the next wire call.
+- **Precedence** for the provider config: settings tab (user layer) → patch
+  row / environment → built-in defaults. Without the settings provider
+  (headless profiles) the row/environment/default chain from the table above
+  still governs, and the trim knobs fall back to the environment variables.
+
 ## Wire map
 
 Both dialects speak OpenAI-compatible `/v1/chat/completions` with:
@@ -87,7 +110,8 @@ Both dialects speak OpenAI-compatible `/v1/chat/completions` with:
   truncation is not presented as a complete answer).
 - usage: `completion_tokens_details.reasoning_tokens` → per-turn reasoning
   tokens in the GUI, when the server reports it (the llama.cpp
-  reasoning-budget build does; NInfer 0.5.0 does not — the field is optional
+  reasoning-budget build does; NInfer 0.5.0 reports it with
+  `stream_options.include_usage` — verified 2026-09; the field is optional
   everywhere).
 - user image blocks → `image_url` data URLs through the attachment seam;
   an unreadable image degrades to a `[image: name w×h]` text placeholder so
@@ -108,9 +132,12 @@ pnpm test          # node --test
 ```
 
 Raw ESM JavaScript with JSDoc (the dsh-llamacpp shipping pattern); no build
-step. Peer pins: `@deepseek-ai/cordis ^4.0.1`, `@deepseek-ai/dsh-llm
+step — the browser half (`./client`) is `React.createElement` for the same
+reason. Peer pins: `@deepseek-ai/cordis ^4.0.1`, `@deepseek-ai/dsh-llm
 ^0.1.1-rc.2` (verified against the npm 0.1.1-rc.2 line; developed and
-machine-verified on the 0.1.2-alpha.3 source tree).
+machine-verified on the 0.1.2-alpha.3 source tree), plus
+`@deepseek-ai/schemastery ^3.18.1` and `react ^18.2.0` for the settings
+section.
 
 ## Known Limitations and Deferred Work
 

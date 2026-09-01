@@ -49,16 +49,14 @@ const LLMACPP_IMAGE_TOKEN_CAP = 1536
  * code rather than an empty stream.
  */
 export class QwenLocalAdapter extends LlmAdapter {
-  #baseURL
-  #model
-  #displayName
-  #apiKey
   #attachment
-  #config
+  #configSource
   #fetch
 
   /**
-   * @param config - resolved configuration from `resolveConfig()` (or a test double).
+   * @param config - resolved configuration from `resolveConfig()` (or a test
+   * double), or a zero-arg source returning one: the settings section makes
+   * the resolved value change live, and the adapter reads it per request.
    * @param config.baseURL - server base URL, including `/v1`.
    * @param config.model - model id to send when a request omits one.
    * @param config.displayName - selector name shown in the GUI; falls back to the model id.
@@ -74,13 +72,31 @@ export class QwenLocalAdapter extends LlmAdapter {
    */
   constructor(config = {}) {
     super()
-    this.#baseURL = config.baseURL
-    this.#model = config.model
-    this.#displayName = config.displayName ?? config.model
-    this.#apiKey = config.apiKey
-    this.#attachment = config.attachment
-    this.#config = config
-    this.#fetch = config.fetch ?? globalThis.fetch
+    this.#configSource = typeof config === 'function' ? config : () => config
+    const initial = this.#configSource()
+    this.#attachment = initial.attachment
+    this.#fetch = initial.fetch ?? globalThis.fetch
+  }
+
+  /** The live resolved configuration (settings section value when installed). */
+  get #config() {
+    return this.#configSource()
+  }
+
+  get #baseURL() {
+    return this.#config.baseURL
+  }
+
+  get #model() {
+    return this.#config.model
+  }
+
+  get #displayName() {
+    return this.#config.displayName || this.#config.model
+  }
+
+  get #apiKey() {
+    return this.#config.apiKey || undefined
   }
 
   /** The chat-completions endpoint this adapter posts to. */

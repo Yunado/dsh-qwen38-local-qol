@@ -210,3 +210,23 @@ dsh-qwen38-local-qol/
    写明差异（我们要语义摘要 + 本地 thinking 模型场景）。
 5. llama 线 `reasoning_tokens` usage 依赖 llama.cpp 服务端补丁（我们的 7 文件
    补丁）——无补丁时 usage 缺字段，插件容错（不报错，GUI 无逐轮 thinking 数）。
+
+## 11. M6：设置 tab（配置全进 UI，2026-09）
+
+用户诉求：设置里新一个 tab——**选 llama or ninfer** + 全参数表单（effort 预算 =
+"reasoning effort 单独的 cap" + compaction 旋钮 + baseURL/model 等）。参考
+样板 = dsh-ads（外部插件 client 半区 + settings.section 槽）。源码验证后的缝：
+
+| 半区 | 缝 | 做法 |
+|---|---|---|
+| 宿主 | `SettingsProvider.installSection(owner, ns, schema, entry, {setSource, onChange, validate?})`（settings/src/index.ts L472，llm-pi-ai L296-310 同款惯用法） | `apply()` 内 `ctx.inject` 后注册 ns `qwen38-local-qol`；schema = schemastery 对象（字段名与 `resolveConfig` 输出一一对应，默认值镜像生产线；partial 自动填默认、未知键透传、错类型拒）；entry/base = **全量 resolved 行**（detach fallback 原样使用，必须含全字段）；跨字段校验（dialect / defaultEffort∈off+预算键 / summarize 旋钮）走 `validate`，写入时 fail-loud |
+| 宿主 | adapter / compaction 活读 | `QwenLocalAdapter` 构造收**配置源 thunk**（`#config` 变 private getter，6 个读取点零改动）；`QwenLocalCompaction.summarize` 每次调用 `this.ctx.get('settings').get(NS)` 活读 `summarize` 块（无 ns 时落 env 链）。**不重注册**（route id 永不变，比 pi-ai 的动态重注册路径简单）→ 保存即下一请求生效，无需重启 |
+| 浏览器 | `settings.section` 槽（ui-settings contract：owner 只给 `close`，数据自携） | `./client` 导出（raw ESM，无 JSX = `React.createElement`，无构建）；`dsh.client` manifest（platform web）+ `dsh.plugin add` 后 profiles/node_modules 自动发现（dsh-ads 先例，**不需要 web-app cordis 行**）；locale 注入 hook（zh/en 双字典，label 随 locale 重注册） |
+| 浏览器 | 读写 | `ctx.remote.settings.describe()` 读 ns view（value+revision）；`update(ns, patch, revision)` 乐观写（响应 = 新 view，fold 回本地）；`settings/conflict` → 重新 describe + 提示；页内展示 revision |
+
+schema 字段 = 配置表全量（dialect/baseURL/model/displayName/apiKey/contextWindow/
+maxTokens/thinkingBudgets{low,medium,xhigh}/defaultEffort/thinkingLevelMap/includeUsage/
+summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/env > 内置默认；
+无 settings provider（headless）时行为与 M5 完全一致。测试：settings-section 12
+（schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
+下一 wire body 变）= 76/76。

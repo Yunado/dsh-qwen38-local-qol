@@ -13,6 +13,93 @@ test('plugin contract: named exports, no default export', () => {
   assert.equal(plugin.default, undefined)
 })
 
+test('apply: installs the user-settings section; the adapter reads the live resolved value', async () => {
+  let registered = null
+  let installCalls = []
+  const ctx = {
+    get: (name) => {
+      if (name !== 'settings') return undefined
+      return {
+        installSection(_owner, ns, _schema, entry, hooks) {
+          let value = entry
+          installCalls.push({
+            ns,
+            entry,
+            setValue: (next) => { value = next },
+          })
+          hooks.setSource(() => value)
+          return () => {}
+        },
+      }
+    },
+    llm: {
+      registerAdapter(_routes, adapter) {
+        registered = adapter
+        return () => {}
+      },
+    },
+  }
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+    'data: [DONE]\n\n',
+  ]
+  const realFetch = globalThis.fetch
+  const requests = []
+  globalThis.fetch = async (_url, init) => {
+    requests.push(init)
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (name) => (name === 'content-type' ? 'text/event-stream' : null) },
+      body: (async function* () {
+        for (const frame of frames) yield new TextEncoder().encode(frame)
+      })(),
+    }
+  }
+  const streamOnce = async (reasoningEffort) => {
+    const chunks = []
+    // No request-level `model`: the wire model rides the config fallback
+    // (`options.model || fallbackModel`), which is what the live settings
+    // value moves.
+    for await (const chunk of registered.stream({
+        provider: 'qwen38',
+        maxTokens: 64,
+        system: 'sys',
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+        ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+        signal: new AbortController().signal,
+      })) chunks.push(chunk)
+    return JSON.parse(requests.at(-1).body)
+  }
+  try {
+    plugin.apply(ctx, {})
+    assert.equal(installCalls.length, 1)
+    assert.equal(installCalls[0].ns, 'qwen38-local-qol')
+    // The base is the fully resolved row (every field present), not the raw config.
+    assert.equal(installCalls[0].entry.model, 'qwen3.8-27b-nvfp4-uncensored')
+    assert.equal(installCalls[0].entry.contextWindow, 229376)
+
+    // First request: the default production line (budgets from the resolved config).
+    let sent = await streamOnce('medium')
+    assert.equal(sent.model, 'qwen3.8-27b-nvfp4-uncensored')
+    assert.equal(sent.reasoning_effort, 'medium')
+    assert.equal(sent.reasoning_budget_tokens, 8192)
+
+    // A settings change lands in the live source; the next request carries it.
+    installCalls[0].setValue({
+      ...installCalls[0].entry,
+      model: 'another-alias',
+      thinkingBudgets: { low: 100, medium: 200, xhigh: 300 },
+    })
+    sent = await streamOnce('medium')
+    assert.equal(sent.model, 'another-alias')
+    assert.equal(sent.reasoning_budget_tokens, 200)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
 test('apply: registers the configured routes with a QwenLocalAdapter and returns the handle', () => {
   let registered = null
   const ctx = {
