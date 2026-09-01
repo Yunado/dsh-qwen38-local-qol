@@ -20,6 +20,18 @@ export const PROVIDER_PROTOCOL_ERROR_CODE = 'PROVIDER_PROTOCOL_ERROR'
 export const PROVIDER_ERROR_CODE = 'PROVIDER_ERROR'
 
 /**
+ * NInfer vision token cost for one image: one token per 32x32 pixel patch
+ * plus two markers, a pure function of input resolution (measured on NInfer
+ * 0.4.0/0.5.0: 256^2 = 66, 1024^2 = 1026, 2048x1024 = 2050).
+ * @param width - image width in pixels.
+ * @param height - image height in pixels.
+ * @returns the visual token count.
+ */
+export function ninferVisionTokens(width, height) {
+  return Math.ceil(width / 32) * Math.ceil(height / 32) + 2
+}
+
+/**
  * Build the chat-completions endpoint for a configured base URL. The default
  * base URL already ends in `/v1`, so the `/v1` is never added a second time.
  * @param baseURL - configured server base, with or without a trailing slash.

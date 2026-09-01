@@ -258,3 +258,31 @@ test('listModels: the configured model with text+image input modalities', async 
   assert.deepEqual(await adapter.listModels('qwen38'),
     [{ provider: 'qwen38', id: 'qwen', name: 'qwen', inputModalities: ['text', 'image'] }])
 })
+
+test('imageRequestPricing: the NInfer patch formula per occurrence, empty priced text', () => {
+  const adapter = new QwenLocalAdapter(CONFIG)
+  const images = [
+    { attachmentId: 'a', mediaType: 'image/png', bytes: 10, width: 256, height: 256 },
+    { attachmentId: 'b', mediaType: 'image/png', bytes: 20, width: 1024, height: 1024 },
+    { attachmentId: 'c', mediaType: 'image/jpeg', bytes: 30, width: 2048, height: 1024 },
+    { attachmentId: 'd', mediaType: 'image/png', bytes: 40, width: 100, height: 50 },
+  ]
+  const prices = adapter.imageRequestPricing('qwen38', 'qwen').priceImages(images)
+  assert.deepEqual(
+    prices.map((price) => price.visualTokens),
+    [66, 1026, 2050, 10], // 256^2, 1024^2, 2048x1024, non-multiple ceil(100/32)*ceil(50/32)+2
+  )
+  assert.ok(prices.every((price) => price.text === ''))
+})
+
+test('imageRequestPricing: the llama.cpp line prices every image at the server clamp maximum', () => {
+  const adapter = new QwenLocalAdapter({ ...CONFIG, dialect: 'llamacpp' })
+  const prices = adapter.imageRequestPricing('qwen38', 'qwen').priceImages([
+    { attachmentId: 'a', mediaType: 'image/png', bytes: 10, width: 64, height: 64 },
+    { attachmentId: 'b', mediaType: 'image/jpeg', bytes: 20, width: 4096, height: 2160 },
+  ])
+  assert.deepEqual(
+    prices.map((price) => [price.visualTokens, price.text]),
+    [[1536, ''], [1536, '']],
+  )
+})

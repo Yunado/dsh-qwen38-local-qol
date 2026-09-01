@@ -103,6 +103,7 @@ profile（其 tui profile）有效。
 | compaction 挂载语法 | fan56/dsh-dcp `cordis.patch.yml`：`- id: compaction-basic, disabled: true` + `- insert: - id: dsh-dcp, name: '@aiwayds/dsh-dcp'`；README："挂在 dsh 的压缩接口上，只替换'摘要'这一环，继承官方触发/保留/锁/tool-pairing"，65 测试 |
 | provider adapter 缝 | jwilson411/dsh-llamacpp：`ctx.llm.registerAdapter(['llamacpp'], adapter)`；`LlmAdapter`/`LlmError`/`attributionHeaders`/`errorChain` 来自 `@deepseek-ai/dsh-llm`；text-only（vision/tool 块显式拒）——我们要做的正是它没做的部分 |
 | 外部插件包结构 | 两个样板一致：`package.json`（type module、`dsh.bundle.patch`、peer+dev 双列 dsh 依赖、`overrides` 钉版、`node --test`）+ `cordis.patch.yml` + `lib/`（dsh-dcp）或 `src/`（dsh-llamacpp）+ README + LICENSE(MIT) |
+| token meter 图像计价缝 | alpha.3 `LlmRuntime.imageRequestPricing`（packages/llm/llm/src/index.ts L659-660）对注册 adapter **无守卫调用** `adapter.imageRequestPricing(provider, model)`；rc.2 `LlmAdapter` 基类**没有**该方法 → rc.2 系 adapter 在 alpha.3 树下 `tokenMeter.measure()` 抛 `not a function`，被 compaction pre-step 的 catch 吞掉（`TargetPressureConfigError` 之外的错误只 warn 后继续）→ **压力压缩静默永不触发**（2026-09 长会话真机实测坐实，已补 adapter 实现） |
 
 ## 4. 配置 schema
 

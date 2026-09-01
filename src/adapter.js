@@ -14,6 +14,7 @@ import {
   createChunkTranslator,
   createSseParser,
   buildQwenBody,
+  ninferVisionTokens,
   parseFrame,
   requestHeaders,
   UNSUPPORTED_CONTENT_CODE,
@@ -32,6 +33,14 @@ export const PROVIDER_NAME = 'Qwen3.8 local'
 
 /** How much of an error body is quoted back in the failure message. */
 const MAX_ERROR_BODY_CHARS = 500
+
+/**
+ * Conservative visual-token estimate for one image on the llama.cpp line:
+ * the server resizes into its `--image-min-tokens`/`--image-max-tokens`
+ * window (1024–1536 in the production bat), so the clamp maximum is the
+ * safe upper bound for the token meter.
+ */
+const LLMACPP_IMAGE_TOKEN_CAP = 1536
 
 /**
  * Adapter for the local Qwen3.8 line. It owns no credentials store, no model
@@ -117,6 +126,27 @@ export class QwenLocalAdapter extends LlmAdapter {
       context: { contextWindow: this.#config.contextWindow },
       defaultMaxTokens: this.#config.maxTokens,
       reasoning: { efforts },
+    }
+  }
+
+  /**
+   * Synchronous per-request image pricing for the token meter. The alpha.3
+   * meter resolves this unguarded on every measurement, and the rc.2 base
+   * class predates the seam, so the adapter supplies the method. Every local
+   * Qwen line is vision-capable: the NInfer line prices with its exact patch
+   * formula; the llama.cpp line is clamped server-side, so the clamp maximum
+   * is the conservative estimate. The data-URL wire carries no model-visible
+   * text for a priced image, so the priced text is empty.
+   * @param provider - a registered provider route.
+   * @param model - the exact model id.
+   * @returns one synchronous price per request image occurrence.
+   */
+  imageRequestPricing(_provider, _model) {
+    const llamacpp = this.#config.dialect === 'llamacpp'
+    return {
+      priceImages: (images) => images.map((ref) => llamacpp
+        ? { visualTokens: LLMACPP_IMAGE_TOKEN_CAP, text: '' }
+        : { visualTokens: ninferVisionTokens(ref.width, ref.height), text: '' }),
     }
   }
 

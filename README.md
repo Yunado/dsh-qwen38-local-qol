@@ -87,8 +87,16 @@ Both dialects speak OpenAI-compatible `/v1/chat/completions` with:
   tokens in the GUI, when the server reports it (the llama.cpp
   reasoning-budget build does; NInfer 0.5.0 does not — the field is optional
   everywhere).
-- user image blocks → `image_url` data URLs (M2; until then a text
-  placeholder) — see Known Limitations.
+- user image blocks → `image_url` data URLs through the attachment seam;
+  an unreadable image degrades to a `[image: name w×h]` text placeholder so
+  one missing store entry never fails the request.
+- token-meter image pricing (`imageRequestPricing`, synchronous, no I/O):
+  the NInfer line prices with its exact patch formula `(W/32)×(H/32)+2`
+  visual tokens; the llama.cpp line is clamped server-side into its
+  `--image-min-tokens`/`--image-max-tokens` window, so every image prices at
+  the clamp maximum (1536) — the conservative bound. The adapter supplies
+  the method because the rc.2 `LlmAdapter` base predates the seam and the
+  newer token meter resolves it unguarded.
 
 ## Develop
 
@@ -104,9 +112,6 @@ machine-verified on the 0.1.2-alpha.3 source tree).
 
 ## Known Limitations and Deferred Work
 
-- **Vision is placeholder-grade until M2.** User image blocks are projected
-  to a terse `[image: name w×h]` text placeholder, not `image_url` data
-  URLs; the durable attachment bytes are not resolved by this plugin yet.
 - **Flash-Next is config-compatible, not artifact-verified.** Same wire and
   dialect logic; no NInfer Flash-Next artifact exists yet (0.5.0 ships 27B
   NVFP4 only), so Flash-Next runs on the `llamacpp` dialect (Unsloth
@@ -116,5 +121,12 @@ machine-verified on the 0.1.2-alpha.3 source tree).
   compaction-basic predates the stock `reasoningEffort: off` summarizer,
   compaction thinking-off depends on the engine's call, not this plugin.
   Alpha.3 and later send it unconditionally.
-- **Preset selection is manual per session** until DSH exposes a
-  default-agent-preset setting.
+- **The preset seam is a Web-surface feature.** Headless profiles do not
+  mount the `agent-presets` row, so their sessions are bare agents and the
+  generated preset's compaction backend does not apply there; the provider
+  route works in both surfaces. Until the upstream opens a preset/settings
+  seam for headless, headless users keep the compaction change on the core
+  patch chain.
+- **Default preset.** The generated preset is selected per session in the
+  GUI, or made the default with the user setting
+  `agent-presets: { default: qwen38-qol }` in `settings.yaml`.
