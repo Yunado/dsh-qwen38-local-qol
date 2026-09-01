@@ -1,0 +1,17 @@
+# Bundle patch layer: mounts the qwen38 provider route on the profile root.
+# The compaction backend row lives in the generated user preset
+# (~/.dsh/.agent-presets/qwen38-qol/agent.cordis.yml, via `node src/setup.js`),
+# because the per-session agent preset owns the isolated compaction group.
+- insert:
+    - id: qwen38
+      name: dsh-qwen38-local-qol
+      config:
+        baseURL: http://127.0.0.1:8082/v1
+        model: qwen3.8-27b-nvfp4-uncensored
+        dialect: ninfer
+        contextWindow: 229376
+        maxTokens: 24576
+        thinkingBudgets:
+          low: 4096
+          medium: 8192
+          xhigh: 16384

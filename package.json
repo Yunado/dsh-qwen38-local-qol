@@ -1,0 +1,70 @@
+{
+  "name": "dsh-qwen38-local-qol",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness QoL plugin for the local Qwen3.8 line (27B, Flash-Next): per-request thinking budgets on both llama.cpp and NInfer dialects, vision + tools, and a compaction backend whose summaries stop burning the output cap on thinking.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Yunado",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./backend": "./src/backend.js",
+    "./setup": "./src/setup.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.14"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "setup": "node src/setup.js"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "qwen",
+    "qwen3.8",
+    "llama-cpp",
+    "ninfer",
+    "thinking-budget",
+    "compaction",
+    "plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yunado/dsh-qwen38-local-qol.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Yunado/dsh-qwen38-local-qol/issues"
+  },
+  "homepage": "https://github.com/Yunado/dsh-qwen38-local-qol#readme",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-compaction-basic": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-attachment": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-brand": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-invariants": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-timeout": "0.1.1-rc.2"
+  }
+}
