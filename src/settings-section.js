@@ -19,6 +19,8 @@ import {
   DIALECT_NINFER,
   DEFAULT_BASE_URL,
   DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_LLAMA_BASE_URL,
+  DEFAULT_LLAMA_MODEL,
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   DEFAULT_THINKING_BUDGETS,
@@ -27,6 +29,22 @@ import { DEFAULT_TRIM_KNOBS } from './prepare.js'
 
 /** The settings namespace this plugin owns. */
 export const NS = 'qwen38-local-qol'
+
+/**
+ * The per-dialect connection block. Each server line (NInfer, llama.cpp)
+ * remembers its own baseURL/model/displayName so switching the dialect in
+ * the tab and back restores that line's values. The top-level
+ * `baseURL`/`model`/`displayName` fields stay authoritative for the adapter
+ * (the tab writes them in sync with the active line); `lines` is the
+ * per-dialect memory the tab swaps between.
+ */
+function lineSchema(baseURL, model) {
+  return Schema.object({
+    baseURL: Schema.string().default(baseURL),
+    model: Schema.string().default(model),
+    displayName: Schema.string().default(''),
+  })
+}
 
 /**
  * Build the namespace schema. Field names match the `resolveConfig` output so
@@ -40,6 +58,10 @@ export function sectionSchema() {
     baseURL: Schema.string().default(DEFAULT_BASE_URL),
     model: Schema.string().default(DEFAULT_MODEL),
     displayName: Schema.string().default(''),
+    lines: Schema.object({
+      ninfer: lineSchema(DEFAULT_BASE_URL, DEFAULT_MODEL),
+      llamacpp: lineSchema(DEFAULT_LLAMA_BASE_URL, DEFAULT_LLAMA_MODEL),
+    }),
     apiKey: Schema.string().default(''),
     contextWindow: Schema.number().default(DEFAULT_CONTEXT_WINDOW),
     maxTokens: Schema.number().default(DEFAULT_MAX_TOKENS),

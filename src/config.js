@@ -12,6 +12,15 @@ export const DEFAULT_BASE_URL = 'http://127.0.0.1:8082/v1'
 /** Model id sent when nothing configures one; matches the server alias. */
 export const DEFAULT_MODEL = 'qwen3.8-27b-nvfp4-uncensored'
 
+/** Where the standby llama.cpp line listens (the production 8080 bat). */
+export const DEFAULT_LLAMA_BASE_URL = 'http://127.0.0.1:8080/v1'
+
+/**
+ * Standby llama line model id: the GGUF basename (llama-server's default
+ * OpenAI alias for `-m <file>` with no `--alias` override).
+ */
+export const DEFAULT_LLAMA_MODEL = 'Huihui-Qwen3.8-27B-abliterated-UD-Q5_K_XL'
+
 /** The single provider route this plugin registers unless configured otherwise. */
 export const DEFAULT_PROVIDER = 'qwen38'
 

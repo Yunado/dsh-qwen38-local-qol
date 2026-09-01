@@ -26,8 +26,8 @@ const COPY = {
   en: {
     title: 'Qwen3.8 Local',
     line: 'Server line',
-    dialectNinfer: 'NInfer (8082)',
-    dialectLlamacpp: 'llama.cpp (8080)',
+    dialectNinfer: 'NInfer',
+    dialectLlamacpp: 'llama.cpp',
     connection: 'Connection',
     baseURL: 'Server base URL',
     model: 'Model id',
@@ -55,8 +55,8 @@ const COPY = {
   zh: {
     title: 'Qwen3.8 本地',
     line: '服务器线',
-    dialectNinfer: 'NInfer (8082)',
-    dialectLlamacpp: 'llama.cpp (8080)',
+    dialectNinfer: 'NInfer',
+    dialectLlamacpp: 'llama.cpp',
     connection: '连接',
     baseURL: '服务器地址',
     model: '模型 id',
@@ -115,21 +115,49 @@ const BUTTON_STYLE = {
   cursor: 'pointer',
 }
 
-/** Pull the editable draft out of a namespace view's resolved value. */
-function toDraft(value) {
+/**
+ * Pull the editable draft out of a namespace view's resolved value.
+ *
+ * The connection fields are per-dialect (`lines`): the draft carries the
+ * active line (baseURL/model/displayName) plus the parked other line, and the
+ * dialect control swaps the two. Sections saved before `lines` existed carry
+ * the connection only at the top level — detect that from the user layer and
+ * migrate the top level into the active line instead of showing the schema
+ * defaults on top of the user's saved values.
+ *
+ * The numeric fields fall back to the production line's values so a fresh
+ * install (no user layer) is fill-once: only the connection fields may be
+ * empty of meaning, everything else ships pre-filled.
+ */
+export function toDraft(value) {
+  const dialect = value.dialect
+  const other = dialect === 'ninfer' ? 'llamacpp' : 'ninfer'
+  const legacy = (value.user ?? {}).lines === undefined
+  const line = (name) => ({
+    baseURL: value.lines?.[name]?.baseURL ?? '',
+    model: value.lines?.[name]?.model ?? '',
+    displayName: value.lines?.[name]?.displayName ?? '',
+  })
+  const active = legacy
+    ? { baseURL: value.baseURL ?? '', model: value.model ?? '', displayName: value.displayName ?? '' }
+    : line(dialect)
+  const parked = line(other)
   return {
-    dialect: value.dialect,
-    baseURL: value.baseURL,
-    model: value.model,
-    displayName: value.displayName ?? '',
-    contextWindow: String(value.contextWindow),
-    maxTokens: String(value.maxTokens),
-    low: String(value.thinkingBudgets?.low ?? ''),
-    medium: String(value.thinkingBudgets?.medium ?? ''),
-    xhigh: String(value.thinkingBudgets?.xhigh ?? ''),
+    dialect,
+    baseURL: active.baseURL,
+    model: active.model,
+    displayName: active.displayName,
+    parkedBaseURL: parked.baseURL,
+    parkedModel: parked.model,
+    parkedDisplayName: parked.displayName,
+    contextWindow: String(value.contextWindow ?? 229376),
+    maxTokens: String(value.maxTokens ?? 24576),
+    low: String(value.thinkingBudgets?.low ?? 4096),
+    medium: String(value.thinkingBudgets?.medium ?? 8192),
+    xhigh: String(value.thinkingBudgets?.xhigh ?? 16384),
     images: value.summarize?.images ?? 'strip',
-    keepTurns: String(value.summarize?.keepTurns ?? ''),
-    toolChars: String(value.summarize?.toolChars ?? ''),
+    keepTurns: String(value.summarize?.keepTurns ?? 5),
+    toolChars: String(value.summarize?.toolChars ?? 2000),
   }
 }
 
@@ -140,6 +168,30 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false })
 
   const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
+
+  // Switching the server line: the active connection fields and the parked
+  // (other dialect's) fields trade places, so each line remembers its own
+  // baseURL/model/displayName across switches and back.
+  const switchDialect = (next) => {
+    setState((s) => {
+      if (s.draft === null || s.draft.dialect === next) return s
+      const d = s.draft
+      return {
+        ...s,
+        saved: false,
+        draft: {
+          ...d,
+          dialect: next,
+          baseURL: d.parkedBaseURL,
+          model: d.parkedModel,
+          displayName: d.parkedDisplayName,
+          parkedBaseURL: d.baseURL,
+          parkedModel: d.model,
+          parkedDisplayName: d.displayName,
+        },
+      }
+    })
+  }
 
   React.useEffect(() => {
     let alive = true
@@ -163,11 +215,19 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       return
     }
     setState((s) => ({ ...s, busy: true, error: null }))
+    // The top-level connection fields are what the adapter reads (the active
+    // line); `lines` persists both lines so switching dialect and back
+    // restores each one's values.
+    const otherDialect = draft.dialect === 'ninfer' ? 'llamacpp' : 'ninfer'
     const patch = {
       dialect: draft.dialect,
       baseURL: draft.baseURL,
       model: draft.model,
       displayName: draft.displayName,
+      lines: {
+        [draft.dialect]: { baseURL: draft.baseURL, model: draft.model, displayName: draft.displayName },
+        [otherDialect]: { baseURL: draft.parkedBaseURL, model: draft.parkedModel, displayName: draft.parkedDisplayName },
+      },
       contextWindow: Number.parseInt(draft.contextWindow, 10),
       maxTokens: Number.parseInt(draft.maxTokens, 10),
       thinkingBudgets: {
@@ -208,13 +268,13 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.line),
       React.createElement('div', { style: { display: 'flex', gap: 16, marginBottom: 16 } },
-        ['ninfer', 'llamacpp'].map((dialect) =>
+        ['llamacpp', 'ninfer'].map((dialect) =>
           React.createElement('label', { key: dialect, style: { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer' } },
             React.createElement('input', {
               type: 'radio',
               name: 'qwen38-dialect',
               checked: draft.dialect === dialect,
-              onChange: () => setDraft({ dialect }),
+              onChange: () => switchDialect(dialect),
             }),
             dialect === 'ninfer' ? t.dialectNinfer : t.dialectLlamacpp,
           ),

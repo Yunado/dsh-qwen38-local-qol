@@ -8,6 +8,8 @@ import { NS, sectionSchema, validateSection } from '../src/settings-section.js'
 import {
   DEFAULT_BASE_URL,
   DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_LLAMA_BASE_URL,
+  DEFAULT_LLAMA_MODEL,
   DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   DEFAULT_THINKING_BUDGETS,
@@ -44,6 +46,27 @@ test('sectionSchema: partial user layers fill the missing fields', () => {
   assert.equal(resolved.baseURL, 'http://127.0.0.1:8080/v1')
   assert.equal(resolved.model, DEFAULT_MODEL)
   assert.equal(resolved.contextWindow, DEFAULT_CONTEXT_WINDOW)
+})
+
+test('sectionSchema: lines carry each dialect production defaults', () => {
+  const resolved = sectionSchema()({})
+  assert.deepEqual(resolved.lines.ninfer, { baseURL: DEFAULT_BASE_URL, model: DEFAULT_MODEL, displayName: '' })
+  assert.deepEqual(resolved.lines.llamacpp, { baseURL: DEFAULT_LLAMA_BASE_URL, model: DEFAULT_LLAMA_MODEL, displayName: '' })
+})
+
+test('sectionSchema: a user-saved line persists over its own defaults', () => {
+  const resolved = sectionSchema()({
+    lines: { llamacpp: { baseURL: 'http://127.0.0.1:9999/v1', model: 'some-alias', displayName: 'LLM' } },
+  })
+  assert.equal(resolved.lines.llamacpp.baseURL, 'http://127.0.0.1:9999/v1')
+  assert.equal(resolved.lines.llamacpp.model, 'some-alias')
+  assert.equal(resolved.lines.llamacpp.displayName, 'LLM')
+  // The untouched line keeps its defaults.
+  assert.deepEqual(resolved.lines.ninfer, { baseURL: DEFAULT_BASE_URL, model: DEFAULT_MODEL, displayName: '' })
+})
+
+test('sectionSchema: a wrong-typed line field is rejected', () => {
+  assert.throws(() => sectionSchema()({ lines: { ninfer: { baseURL: 42 } } }))
 })
 
 test('sectionSchema: wrong-typed fields are rejected', () => {

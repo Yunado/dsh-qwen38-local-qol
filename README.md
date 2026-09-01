@@ -80,19 +80,39 @@ The generated preset pins the backend row's `maxTokens` to `16384` (the stock
 
 On a profile with the settings provider (the web surface), the plugin registers
 the user-settings namespace `qwen38-local-qol` and a **Qwen3.8 Local** page in
-the settings dialog. The tab exposes the full provider config — the server
-line selector (NInfer vs llama.cpp, i.e. the `dialect` field), `baseURL`,
-`model`, `displayName`, `contextWindow`, `maxTokens`, `includeUsage`, the
-per-effort `thinkingBudgets`, `defaultEffort`, and the compaction trim knobs
-(`summarize.images` / `summarize.keepTurns` / `summarize.toolChars`) — plus a
-revision indicator and conflict handling for concurrent edits.
+the settings dialog. The tab exposes the provider config a human actually
+adjusts: the server line selector (llama.cpp / NInfer, i.e. the `dialect`
+field — ports stay out of the labels because they are user-chosen), the
+connection fields (`baseURL`, `model`, `displayName`) **per dialect**,
+`contextWindow`, `maxTokens`, the per-effort `thinkingBudgets`, and the
+compaction trim knobs (`summarize.images` / `summarize.keepTurns` /
+`summarize.toolChars`) — plus a revision indicator and conflict handling for
+concurrent edits.
 
+- **Per-dialect line memory**: the section persists a `lines` block
+  (`lines.ninfer` / `lines.llamacpp`, each a `{baseURL, model, displayName}`)
+  alongside the top-level `baseURL`/`model`/`displayName`, which the tab keeps
+  in sync with the *active* line — those top-level fields are what the adapter
+  reads, so the host side needs no line awareness. Switching the line in the
+  tab swaps the two remembered lines; switching back restores the previous
+  line's values. A section saved before `lines` existed is migrated
+  transparently (the top level becomes the active line's memory).
+- **Fill-once defaults**: `contextWindow` 229376, `maxTokens` 24576, budgets
+  4096/8192/16384, trim knobs strip/5/2000, and each line's production
+  connection (NInfer 8082 + the 27B NVFP4 artifact id; llama.cpp 8080 + the
+  GGUF basename) are the schema defaults, so a fresh install pre-fills the
+  whole form and only the fields that differ from the defaults need typing.
+  `includeUsage` (default `true`) and `defaultEffort` (default `medium`) are
+  deliberately *not* tab controls — they stay in the schema/config layer
+  (patch row / environment) and are off by design on a dedicated local line.
 - **Persistence** is the settings document (`settings.yaml`, hot-reloaded);
   the write path carries the namespace revision, and a stale write surfaces as
   a conflict (re-read), never a silent overwrite.
 - **Effect is live, no restart**: the adapter reads the resolved value per
   request and the compaction backend per summarize call, so a saved change
-  applies on the next wire call.
+  applies on the next wire call. (A *new chat session* is still required for
+  the model catalog fields — `contextWindow` / `maxTokens` / `displayName`
+  resolve at session start.)
 - **Precedence** for the provider config: settings tab (user layer) → patch
   row / environment → built-in defaults. Without the settings provider
   (headless profiles) the row/environment/default chain from the table above

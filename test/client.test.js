@@ -112,3 +112,40 @@ test('client: a stale-revision write answers a conflict the caller can re-load',
   const fresh = await captured.load()
   assert.equal(fresh.value.revision, 9)
 })
+
+test('toDraft: a fresh section (no user layer) ships the production defaults pre-filled', () => {
+  const draft = client.toDraft({ dialect: 'ninfer', baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored' })
+  assert.equal(draft.contextWindow, '229376')
+  assert.equal(draft.maxTokens, '24576')
+  assert.equal(draft.low, '4096')
+  assert.equal(draft.medium, '8192')
+  assert.equal(draft.xhigh, '16384')
+  assert.equal(draft.images, 'strip')
+  assert.equal(draft.keepTurns, '5')
+  assert.equal(draft.toolChars, '2000')
+  // Legacy shape (no user.lines): the active line migrates from the top level.
+  assert.equal(draft.baseURL, 'http://127.0.0.1:8082/v1')
+  assert.equal(draft.model, 'qwen3.8-27b-nvfp4-uncensored')
+  assert.equal(draft.parkedBaseURL, '')
+})
+
+test('toDraft: a new-shape section reads the active line from lines and parks the other', () => {
+  const value = {
+    dialect: 'llamacpp',
+    baseURL: 'http://127.0.0.1:8080/v1',
+    model: 'Huihui',
+    user: { lines: { ninfer: {}, llamacpp: {} } },
+    lines: {
+      ninfer: { baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored', displayName: 'N' },
+      llamacpp: { baseURL: 'http://127.0.0.1:8080/v1', model: 'Huihui', displayName: 'L' },
+    },
+  }
+  const draft = client.toDraft(value)
+  assert.equal(draft.dialect, 'llamacpp')
+  assert.equal(draft.baseURL, 'http://127.0.0.1:8080/v1')
+  assert.equal(draft.model, 'Huihui')
+  assert.equal(draft.displayName, 'L')
+  assert.equal(draft.parkedBaseURL, 'http://127.0.0.1:8082/v1')
+  assert.equal(draft.parkedModel, 'qwen3.8-27b-nvfp4-uncensored')
+  assert.equal(draft.parkedDisplayName, 'N')
+})
