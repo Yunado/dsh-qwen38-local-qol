@@ -7,7 +7,8 @@
  * request so a saved change applies on the next wire call without a restart.
  *
  * Schema defaults mirror `resolveConfig`'s built-ins so a namespace read
- * without any user or base layer is the production line. `thinkingBudgets`
+ * without any user or base layer opens on the general default (the
+ * llama.cpp line; NInfer is the per-line memory under `lines.ninfer`). `thinkingBudgets`
  * keys and `defaultEffort` are cross-validated (the schema cannot express
  * "effort id must be a declared budget key").
  *
@@ -67,7 +68,7 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets) {
  */
 export function sectionSchema() {
   return Schema.object({
-    dialect: Schema.string().default(DIALECT_NINFER),
+    dialect: Schema.string().default(DIALECT_LLAMACPP),
     baseURL: Schema.string().default(DEFAULT_BASE_URL),
     model: Schema.string().default(DEFAULT_MODEL),
     displayName: Schema.string().default(''),

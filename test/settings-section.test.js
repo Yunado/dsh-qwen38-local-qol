@@ -20,10 +20,10 @@ test('NS: the plugin owns one lowercase hyphenated namespace', () => {
   assert.equal(NS, 'qwen38-local-qol')
 })
 
-test('sectionSchema: a fully-default value is the production line', () => {
+test('sectionSchema: a fully-default value opens on the general default (llama.cpp line)', () => {
   const schema = sectionSchema()
   const resolved = schema({})
-  assert.equal(resolved.dialect, 'ninfer')
+  assert.equal(resolved.dialect, 'llamacpp')
   assert.equal(resolved.baseURL, DEFAULT_BASE_URL)
   assert.equal(resolved.model, DEFAULT_MODEL)
   assert.equal(resolved.displayName, '')

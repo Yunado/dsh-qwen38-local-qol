@@ -107,7 +107,7 @@ function budgetMap(value, fallback) {
  * @returns the resolved provider configuration.
  */
 export function resolveConfig(config = {}, env = process.env) {
-  const dialect = setting(config.dialect, env.DSH_QWEN38_DIALECT, DIALECT_NINFER)
+  const dialect = setting(config.dialect, env.DSH_QWEN38_DIALECT, DIALECT_LLAMACPP)
   if (dialect !== DIALECT_NINFER && dialect !== DIALECT_LLAMACPP) {
     throw new Error(`dsh-qwen38-local-qol: dialect must be "${DIALECT_NINFER}" or "${DIALECT_LLAMACPP}", got "${dialect}"`)
   }

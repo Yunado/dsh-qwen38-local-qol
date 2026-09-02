@@ -61,7 +61,7 @@ fields the patch leaves out):
 | `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | model id sent when a request omits one (the NInfer 0.5.0 artifact id — same for the Docker and the Windows build; verify against the running server with `GET /v1/models`; the llama.cpp line serves its own id — set this field or the env there) |
 | `displayName` | `DSH_QWEN38_DISPLAY_NAME` | the model id | human-readable name for the GUI model selector (the wire id is an artifact alias) |
 | `apiKey` | `DSH_QWEN38_API_KEY` | — | server `--api-key`, when set |
-| `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` or `llamacpp` (the thinking wire) |
+| `dialect` | `DSH_QWEN38_DIALECT` | `llamacpp` | `ninfer` or `llamacpp` (the thinking wire); a fresh install opens on the llama.cpp line — switch the line in the tab |
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | declared context capacity (pressure compaction requires it) |
 | `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | declared per-request output cap |
 | `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | per-effort hard thinking budgets; the declared effort vocabulary is `off` + these keys (NInfer line: sent but ignored — the effective cap is `defaultThinkingBudget` / the server flag) |
@@ -122,7 +122,8 @@ concurrent edits.
   4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
   line's production connection (NInfer 8082 + the 27B NVFP4 artifact id;
   llama.cpp 8080 + the GGUF basename) are the schema defaults, so a fresh
-  install pre-fills the whole form and only the fields that differ from the
+  install — which opens on the llama.cpp line (the general default) —
+  pre-fills the whole form and only the fields that differ from the
   defaults need typing. `includeUsage` (default `true`) and `defaultEffort`
   (default `medium`) are deliberately *not* tab controls — they stay in the
   schema/config layer (patch row / environment) and are off by design on a
@@ -273,7 +274,7 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 | `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | 请求未带 model 时发送的 id（NInfer 0.5.0 工件 id——Docker 与 Windows build 相同；可用 `GET /v1/models` 对运行中的服务器核实；llama.cpp 线用自己的 id——在那边设此字段或环境变量） |
 | `displayName` | `DSH_QWEN38_DISPLAY_NAME` | model id | GUI 模型选择器的可读名（wire id 是工件别名） |
 | `apiKey` | `DSH_QWEN38_API_KEY` | — | 服务器 `--api-key`（如设置） |
-| `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` 或 `llamacpp`（thinking wire 方言） |
+| `dialect` | `DSH_QWEN38_DIALECT` | `llamacpp` | `ninfer` 或 `llamacpp`（thinking wire 方言）；新装默认打开 llama.cpp 线——在 tab 里切线 |
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | 声明的上下文容量（压力压缩需要它） |
 | `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | 声明的每请求输出帽 |
 | `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | 每档 effort 的 thinking 硬帽；声明的 effort 词汇 = `off` + 这些键（NInfer 线：发送但被忽略——实际帽 = `defaultThinkingBudget` / 服务端参数） |
@@ -323,7 +324,8 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 - **填一次默认值**：所有窗口数字（每线 229376 / 24576 /
   4096-8192-16384）、裁剪旋钮（strip / 5 / 2000）、每条线的生产连接
   （NInfer 8082 + 27B NVFP4 工件 id；llama.cpp 8080 + GGUF 基名）都是
-  schema 默认值——新安装整表预填，只需填与默认不同的字段。`includeUsage`
+  schema 默认值——新安装默认打开 llama.cpp 线（general 默认），整表预填，
+  只需填与默认不同的字段。`includeUsage`
   （默认 `true`）与 `defaultEffort`（默认 `medium`）刻意**不是** tab
   控件——留在 schema/config 层（补丁行/环境），在专用本地线上按设计
   关闭。
