@@ -134,6 +134,18 @@ const BUTTON_STYLE = {
   cursor: 'pointer',
 }
 
+// Pin the page to the host theme tokens instead of bare inheritance: the
+// settings panel renders var(--dsw-alias-bg-layer-2) and the host's text is
+// var(--dsw-alias-label-primary-foreground) — both flip on the host
+// appearance (light/dark/system), so the page is dark with light text on a
+// dark host and light with dark text on a light host, seamless against the
+// panel. The fallbacks cover a host that never shipped the tokens.
+const ROOT_STYLE = {
+  maxWidth: 560,
+  background: 'var(--dsw-alias-bg-layer-2, #ffffff)',
+  color: 'var(--dsw-alias-label-primary-foreground, #111111)',
+}
+
 /**
  * Pull the editable draft out of a namespace view's resolved value.
  *
@@ -322,13 +334,13 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   }
 
   if (state.status === 'loading') {
-    return React.createElement('div', null, t.loading)
+    return React.createElement('div', { style: ROOT_STYLE }, t.loading)
   }
   if (state.status === 'error') {
-    return React.createElement('div', null, state.error)
+    return React.createElement('div', { style: ROOT_STYLE }, state.error)
   }
   const { view, draft } = state
-  return React.createElement('div', { style: { maxWidth: 560 } },
+  return React.createElement('div', { style: ROOT_STYLE },
     React.createElement('h2', { style: { marginTop: 0 } }, t.title),
     state.error !== null
       ? React.createElement('div', { style: { fontSize: 12, opacity: 0.8, marginBottom: 12 } }, state.error)
