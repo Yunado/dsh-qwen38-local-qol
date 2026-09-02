@@ -134,16 +134,17 @@ const BUTTON_STYLE = {
   cursor: 'pointer',
 }
 
-// Pin the page to the host theme tokens instead of bare inheritance: the
-// settings panel renders var(--dsw-alias-bg-layer-2) and the host's text is
-// var(--dsw-alias-label-primary-foreground) — both flip on the host
-// appearance (light/dark/system), so the page is dark with light text on a
-// dark host and light with dark text on a light host, seamless against the
-// panel. The fallbacks cover a host that never shipped the tokens.
+// Pin the page text to the host's primary label token instead of bare
+// inheritance: var(--dsw-alias-label-primary) flips on the host appearance
+// (light: near-black rgb(15,17,21) on the white panel; dark: near-white
+// rgb(249,250,251) on the dark panel). The background stays transparent —
+// the settings panel already renders the correct themed surface, so the
+// page rides it with no seam. The fallback covers a host without the
+// tokens. (label-primary-foreground is the inverted label *surface*, not
+// the text color — do not use it here.)
 const ROOT_STYLE = {
   maxWidth: 560,
-  background: 'var(--dsw-alias-bg-layer-2, #ffffff)',
-  color: 'var(--dsw-alias-label-primary-foreground, #111111)',
+  color: 'var(--dsw-alias-label-primary, #111111)',
 }
 
 /**
