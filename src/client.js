@@ -107,31 +107,21 @@ const INPUT_STYLE = {
   color: 'inherit',
 }
 
-// The native <select> control paints its own light fill even when the
-// background is transparent (the text input does not), so a transparent
-// select on the dark settings dialog rendered white-on-white. An explicit
-// fill keeps the strip/keep option readable; the fill follows the host
-// appearance, which the theme plugin resolves into the body attribute
-// data-ds-dark-theme (present iff dark, for light/dark/system alike).
-const SELECT_STYLE_DARK = {
+// The native <select> control paints its own fill even with a transparent
+// background (the text input does not), which rendered white-on-white on
+// the dark dialog. appearance:none strips the native skin so the control
+// keeps the exact look of the other fields — transparent fill, inherited
+// text color; the dropdown list follows the color-scheme the host writes
+// on <html>, and a neutral chevron stays visible in both themes.
+const SELECT_STYLE = {
   ...INPUT_STYLE,
-  background: '#26262b',
-  color: '#ececec',
-}
-
-const SELECT_STYLE_LIGHT = {
-  ...INPUT_STYLE,
-  background: '#f4f4f4',
-  color: '#111111',
-}
-
-/** Whether the host currently renders the dark appearance. */
-function hostIsDark() {
-  try {
-    return document.body?.hasAttribute('data-ds-dark-theme') === true
-  } catch {
-    return true
-  }
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  paddingRight: 26,
+  backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 8px center',
+  backgroundSize: '12px',
 }
 
 const BUTTON_STYLE = {
@@ -217,15 +207,6 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const locale = useLocale((snapshot) => (snapshot.active === 'zh' ? 'zh' : 'en'))
   const t = COPY[locale]
   const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false })
-  const [dark, setDark] = React.useState(hostIsDark)
-
-  // Follow the host appearance (the settings General/Appearance row): the
-  // theme plugin owns data-ds-dark-theme on body and rewrites it on changes.
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => setDark(hostIsDark()))
-    observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
-    return () => observer.disconnect()
-  }, [])
 
   const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
 
@@ -399,7 +380,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.compaction),
       React.createElement(Field, { label: t.summarizeImages },
-        React.createElement('select', { style: dark ? SELECT_STYLE_DARK : SELECT_STYLE_LIGHT, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
+        React.createElement('select', { style: SELECT_STYLE, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
           React.createElement('option', { value: 'strip' }, t.strip),
           React.createElement('option', { value: 'keep' }, t.keep),
         )),
