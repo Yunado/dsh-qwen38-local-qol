@@ -2,9 +2,13 @@
 
 [English](#dsh-qwen38-local-qol) · [中文](#中文)
 
-DeepSeek Harness QoL plugin for the local Qwen3.8 line — **Qwen3.8-27B**
-(llama.cpp `llama-server` or NInfer) and, at the config level,
-**Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
+A QoL plugin for DSH (DeepSeek Harness) for people running **Qwen3.8
+locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
+([Neroued/ninfer](https://github.com/Neroued/ninfer), which ships as an
+upstream **Docker** image and a native **Windows build**; both serve the same
+OpenAI-compatible `/v1` API, so one plugin config covers either), and, at the
+config level, **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same
+dialect logic).
 
 It gives stock DSH (no core patches, no pi-ai patchfile) two things the local
 Qwen line needs:
@@ -54,7 +58,7 @@ fields the patch leaves out):
 | Field | Env fallback | Default | Meaning |
 |---|---|---|---|
 | `baseURL` | `DSH_QWEN38_BASE_URL` | `http://127.0.0.1:8082/v1` | server base, including `/v1` |
-| `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | model id sent when a request omits one (the NInfer 0.5.0 artifact id; the llama.cpp line serves its own id — set this field or the env there) |
+| `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | model id sent when a request omits one (the NInfer 0.5.0 artifact id — same for the Docker and the Windows build; verify against the running server with `GET /v1/models`; the llama.cpp line serves its own id — set this field or the env there) |
 | `displayName` | `DSH_QWEN38_DISPLAY_NAME` | the model id | human-readable name for the GUI model selector (the wire id is an artifact alias) |
 | `apiKey` | `DSH_QWEN38_API_KEY` | — | server `--api-key`, when set |
 | `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` or `llamacpp` (the thinking wire) |
@@ -106,15 +110,10 @@ concurrent edits.
   line's values. The compaction trim knobs (`summarize`) stay shared: they
   describe model behavior, not the line.
 - **Dialect-aware thinking-budget note**: the tab sends
-  `reasoning_budget_tokens` on both dialects, but NInfer does not support a
-  per-request thinking budget at all — its OpenAI endpoint has no such field
-  (verified in the engine's source; the cap is the server's
-  `--default-thinking-budget` flag). NInfer is a from-scratch C++/CUDA
-  engine ([Neroued/ninfer](https://github.com/Neroued/ninfer)), not a
-  llama.cpp fork, so the limitation is engine-level, not a build artifact.
-  llama.cpp honors the field per request (the selected level's value
-  overrides `--reasoning-budget`). The hint under the budget fields follows
-  the selected line and says exactly that.
+  `reasoning_budget_tokens` on both dialects; NInfer has no per-request
+  thinking budget (engine-level; the effective cap is the server's
+  `--default-thinking-budget` flag), while llama.cpp honors the field per
+  request. The hint under the budget fields follows the selected line.
 - **Fill-once defaults**: every window number (229376 / 24576 /
   4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
   line's production connection (NInfer 8082 + the 27B NVFP4 artifact id;
@@ -215,8 +214,10 @@ settings section.
 
 # 中文
 
-DeepSeek Harness 本地 Qwen3.8 线的 QoL 插件——**Qwen3.8-27B**
-（llama.cpp `llama-server` 或 NInfer）以及配置层面的
+给**本地跑 Qwen3.8** 的人用的 DSH（DeepSeek Harness）QoL 插件——
+**Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)，
+有原版 **Docker** 镜像与原生 **Windows build** 两种形态；两者都提供同一套
+OpenAI 兼容 `/v1` API，一份插件配置通吃），以及配置层面的
 **Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，同一方言逻辑）。
 
 它给原版 DSH（无核心补丁、无 pi-ai 补丁文件）补上本地 Qwen 线需要的
@@ -264,7 +265,7 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 | 字段 | 环境回退 | 默认值 | 含义 |
 |---|---|---|---|
 | `baseURL` | `DSH_QWEN38_BASE_URL` | `http://127.0.0.1:8082/v1` | 服务器地址（含 `/v1`） |
-| `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | 请求未带 model 时发送的 id（NInfer 0.5.0 工件 id；llama.cpp 线用自己的 id——在那边设此字段或环境变量） |
+| `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | 请求未带 model 时发送的 id（NInfer 0.5.0 工件 id——Docker 与 Windows build 相同；可用 `GET /v1/models` 对运行中的服务器核实；llama.cpp 线用自己的 id——在那边设此字段或环境变量） |
 | `displayName` | `DSH_QWEN38_DISPLAY_NAME` | model id | GUI 模型选择器的可读名（wire id 是工件别名） |
 | `apiKey` | `DSH_QWEN38_API_KEY` | — | 服务器 `--api-key`（如设置） |
 | `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` 或 `llamacpp`（thinking wire 方言） |
@@ -308,13 +309,9 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
   迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
   （`summarize`）保持共享：它描述模型行为，不是线的属性。
 - **随方言的 thinking 预算注释**：tab 在双方言都发
-  `reasoning_budget_tokens`，但 NInfer 完全不支持逐请求 thinking 预算——
-  其 OpenAI 端点没有此字段（引擎源码验证；帽 = 服务端
-  `--default-thinking-budget` 参数）。NInfer 是 from-scratch C++/CUDA
-  引擎（[Neroued/ninfer](https://github.com/Neroued/ninfer)），不是
-  llama.cpp fork，所以限制是引擎级的，不是构建产物。llama.cpp 逐请求
-  遵守此字段（所选档的值覆盖 `--reasoning-budget`）。预算字段下的注释
-  跟随所选线，说的正是这件事。
+  `reasoning_budget_tokens`；NInfer 没有逐请求 thinking 预算（引擎级限制；
+  实际帽 = 服务端 `--default-thinking-budget` 参数），llama.cpp 逐请求
+  遵守此字段。预算字段下的注释跟随所选线。
 - **填一次默认值**：所有窗口数字（每线 229376 / 24576 /
   4096-8192-16384）、裁剪旋钮（strip / 5 / 2000）、每条线的生产连接
   （NInfer 8082 + 27B NVFP4 工件 id；llama.cpp 8080 + GGUF 基名）都是
