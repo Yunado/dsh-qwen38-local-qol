@@ -4,10 +4,10 @@
 
 A QoL plugin for DSH (DeepSeek Harness) for people running **Qwen3.8
 locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
-([Neroued/ninfer](https://github.com/Neroued/ninfer): the upstream
-**ninfer 0.5.0** release (Docker image) and **ninfer-windows 0.5.0**
-(native Windows build); both serve the same OpenAI-compatible `/v1` API,
-so one plugin config covers either), and, at the config level,
+([Neroued/ninfer](https://github.com/Neroued/ninfer): the upstream build —
+source / Docker image, no versioned releases — and the
+**ninfer-windows 0.5.0** native Windows build; both serve the same
+OpenAI-compatible `/v1` API, so one plugin config covers either), and, at the
 **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
 
 It gives stock DSH (no core patches, no pi-ai patchfile) two things the local
@@ -114,10 +114,10 @@ concurrent edits.
   describe model behavior, not the line.
 - **Dialect-aware thinking-budget fields**: on the NInfer line the per-effort
   numbers are greyed out (NInfer has no per-request thinking budget —
-  ninfer 0.5.0 / ninfer-windows 0.5.0; the values are sent but ignored), and a
-  single **default thinking budget** field records the server's
-  `--default-thinking-budget` flag value (one value for all efforts). On the
-  llama.cpp line the per-effort fields stay live (honored per request).
+  upstream ninfer, unversioned / ninfer-windows 0.5.0; the values are sent
+  but ignored), and a single **thinking-budget (all efforts)** field records
+  the server's `--default-thinking-budget` flag value — keep the two in sync.
+  On the llama.cpp line the per-effort fields stay live (honored per request).
 - **Fill-once defaults**: every window number (229376 / 24576 /
   4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
   line's production connection (NInfer 8082 + the 27B NVFP4 artifact id;
@@ -220,7 +220,7 @@ settings section.
 
 给**本地跑 Qwen3.8** 的人用的 DSH（DeepSeek Harness）QoL 插件——
 **Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)：
-**ninfer 0.5.0** 原版发布（Docker 镜像）与 **ninfer-windows 0.5.0**
+上游构建——源码 / Docker 镜像，无版本化发布——与 **ninfer-windows 0.5.0**
 （原生 Windows build）；两者都提供同一套 OpenAI 兼容 `/v1` API，一份插件
 配置通吃），以及配置层面的 **Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，
 同一方言逻辑）。
@@ -316,9 +316,9 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
   迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
   （`summarize`）保持共享：它描述模型行为，不是线的属性。
 - **随方言的 thinking 预算字段**：NInfer 线把按 effort 的数字置灰（NInfer
-  没有逐请求 thinking 预算——ninfer 0.5.0 / ninfer-windows 0.5.0；数值照发
-  但被忽略），另有一个**默认 thinking 预算**字段记录服务端
-  `--default-thinking-budget` 参数值（全部 effort 共用一个值）。llama.cpp
+  没有逐请求 thinking 预算——上游 ninfer 无版本号 / ninfer-windows 0.5.0；
+  数值照发但被忽略），另有一个 **thinking 预算（全部 effort）** 字段记录
+  服务端 `--default-thinking-budget` 参数值——两者保持同步。llama.cpp
   线按 effort 的字段保持可用（逐请求生效）。
 - **填一次默认值**：所有窗口数字（每线 229376 / 24576 /
   4096-8192-16384）、裁剪旋钮（strip / 5 / 2000）、每条线的生产连接
