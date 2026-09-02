@@ -109,12 +109,29 @@ const INPUT_STYLE = {
 
 // The native <select> control paints its own light fill even when the
 // background is transparent (the text input does not), so a transparent
-// select on the dark settings dialog renders white-on-white. An explicit
-// light box with dark text stays readable in both host themes.
-const SELECT_STYLE = {
+// select on the dark settings dialog rendered white-on-white. An explicit
+// fill keeps the strip/keep option readable; the fill follows the host
+// appearance, which the theme plugin resolves into the body attribute
+// data-ds-dark-theme (present iff dark, for light/dark/system alike).
+const SELECT_STYLE_DARK = {
+  ...INPUT_STYLE,
+  background: '#26262b',
+  color: '#ececec',
+}
+
+const SELECT_STYLE_LIGHT = {
   ...INPUT_STYLE,
   background: '#f4f4f4',
   color: '#111111',
+}
+
+/** Whether the host currently renders the dark appearance. */
+function hostIsDark() {
+  try {
+    return document.body?.hasAttribute('data-ds-dark-theme') === true
+  } catch {
+    return true
+  }
 }
 
 const BUTTON_STYLE = {
@@ -200,6 +217,15 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const locale = useLocale((snapshot) => (snapshot.active === 'zh' ? 'zh' : 'en'))
   const t = COPY[locale]
   const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false })
+  const [dark, setDark] = React.useState(hostIsDark)
+
+  // Follow the host appearance (the settings General/Appearance row): the
+  // theme plugin owns data-ds-dark-theme on body and rewrites it on changes.
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => setDark(hostIsDark()))
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
+    return () => observer.disconnect()
+  }, [])
 
   const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
 
@@ -373,7 +399,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.compaction),
       React.createElement(Field, { label: t.summarizeImages },
-        React.createElement('select', { style: SELECT_STYLE, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
+        React.createElement('select', { style: dark ? SELECT_STYLE_DARK : SELECT_STYLE_LIGHT, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
           React.createElement('option', { value: 'strip' }, t.strip),
           React.createElement('option', { value: 'keep' }, t.keep),
         )),
