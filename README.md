@@ -7,7 +7,7 @@ locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
 ([Neroued/ninfer](https://github.com/Neroued/ninfer) — source build or
 self-built Docker image, as of 2026-09-02 — and the **ninfer-windows 0.5.0**
 native Windows build; both serve the same OpenAI-compatible `/v1` API, so one
-plugin config covers either), and, at the
+plugin config covers either), and, at the config level,
 **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
 
 It gives stock DSH (no core patches, no pi-ai patchfile) two things the local
