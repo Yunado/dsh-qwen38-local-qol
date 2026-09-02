@@ -75,7 +75,7 @@ stock config schema does not know):
 
 | Env | Default | Meaning |
 |---|---|---|
-| `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` reduces image blocks to text placeholders; `keep` retains them |
+| `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` reduces image blocks to text placeholders — **prefer this when the vision mmproj is offloaded to a second device** (common local setups, e.g. llama.cpp `--mmproj-device <iGPU>`): the summarizer then never re-encodes images on the offload device. `keep` retains them so the checkpoint can describe the pixels (every compaction re-encodes the images — slower + vision tokens) |
 | `DSH_QWEN38_SUMMARIZE_KEEP_TURNS` | `5` | assistant turns at the region tail whose reasoning is kept |
 | `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | per-tool-result character cap; `0` disables |
 
@@ -281,7 +281,7 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 
 | 环境变量 | 默认值 | 含义 |
 |---|---|---|
-| `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` 把图片块降为文本占位符；`keep` 保留 |
+| `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` 把图片块降为文本占位符——**vision mmproj offload 到第二设备时优选**（常见本地配置，如 llama.cpp `--mmproj-device <iGPU>`）：摘要器不再在离卡设备上重编码图片。`keep` 保留，checkpoint 能描述像素（每次压缩都重编码——更慢 + 视觉 token 开销） |
 | `DSH_QWEN38_SUMMARIZE_KEEP_TURNS` | `5` | 区域尾部保留 reasoning 的 assistant 轮数 |
 | `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | 单条工具结果字符帽；`0` 禁用 |
 
