@@ -107,6 +107,16 @@ const INPUT_STYLE = {
   color: 'inherit',
 }
 
+// The native <select> control paints its own light fill even when the
+// background is transparent (the text input does not), so a transparent
+// select on the dark settings dialog renders white-on-white. An explicit
+// light box with dark text stays readable in both host themes.
+const SELECT_STYLE = {
+  ...INPUT_STYLE,
+  background: '#f4f4f4',
+  color: '#111111',
+}
+
 const BUTTON_STYLE = {
   padding: '6px 18px',
   fontSize: 13,
@@ -363,7 +373,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.compaction),
       React.createElement(Field, { label: t.summarizeImages },
-        React.createElement('select', { style: INPUT_STYLE, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
+        React.createElement('select', { style: SELECT_STYLE, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
           React.createElement('option', { value: 'strip' }, t.strip),
           React.createElement('option', { value: 'keep' }, t.keep),
         )),
