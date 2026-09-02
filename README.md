@@ -41,8 +41,9 @@ One package, three registrations:
 ## Install
 
 ```sh
-dsh plugin add github:Yunado/dsh-qwen38-local-qol
-# generate the user preset from the installed standard preset (dated backup on re-run):
+# same as any other plugin (add --profile <name> for a non-default profile):
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
+# plugin-specific one-time step — generate the compaction user preset (dated backup on re-run):
 node_modules/dsh-qwen38-local-qol/src/setup.js --src <path to the installed @deepseek-ai/dsh-agent-presets presets/standard/agent.cordis.yml>
 ```
 
@@ -261,8 +262,9 @@ Windows build）；两者都提供同一套 OpenAI 兼容 `/v1` API，一份插�
 ## 安装
 
 ```sh
-dsh plugin add github:Yunado/dsh-qwen38-local-qol
-# 从已安装的 standard preset 生成用户 preset（重跑会留日期备份）：
+# 与其他插件相同（非默认 profile 加 --profile <name>）：
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
+# 本插件特有的一次性步骤——生成压缩用户 preset（重跑会留日期备份）：
 node_modules/dsh-qwen38-local-qol/src/setup.js --src <已安装的 @deepseek-ai/dsh-agent-presets 的 presets/standard/agent.cordis.yml 路径>
 ```
 
