@@ -2,6 +2,8 @@
 
 [English](#dsh-qwen38-local-qol) · [中文](#中文)
 
+![The settings tab on the NInfer line — per-effort budgets greyed out, single all-efforts budget](docs/screenshot-ninfer-en.png)
+
 A QoL plugin for DSH (DeepSeek Harness) for people running **Qwen3.8
 locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
 ([Neroued/ninfer](https://github.com/Neroued/ninfer) — source build or
@@ -97,6 +99,12 @@ and the
 compaction trim knobs (`summarize.images` / `summarize.keepTurns` /
 `summarize.toolChars`) — plus a revision indicator and conflict handling for
 concurrent edits.
+
+The tab, both lines:
+
+| llama.cpp line (per-effort budgets live) | NInfer line (per-effort greyed out, single all-efforts budget) |
+|---|---|
+| ![llama.cpp line](docs/screenshot-llama-en.png) | ![NInfer line](docs/screenshot-ninfer-en.png) |
 
 - **Per-dialect line memory**: the section persists a `lines` block
   (`lines.ninfer` / `lines.llamacpp`) where each line remembers its own
@@ -306,6 +314,12 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 （仅 NInfer 线显示）、压缩裁剪旋钮（`summarize.images` /
 `summarize.keepTurns` / `summarize.toolChars`）——外加版本号指示器与并发
 编辑冲突处理。
+
+tab 实况（两条线）：
+
+| llama.cpp 线（按 effort 可用） | NInfer 线（按 effort 置灰 + 全部 effort 单值） |
+|---|---|
+| ![llama.cpp 线](docs/screenshot-llama-zh.png) | ![NInfer 线](docs/screenshot-ninfer-zh.png) |
 
 - **按方言的线记忆**：section 持久化 `lines` 块（`lines.ninfer` /
   `lines.llamacpp`），每条线记住自己的连接（`baseURL` / `model` /
