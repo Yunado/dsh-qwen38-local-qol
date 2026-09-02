@@ -40,10 +40,12 @@ export const NS = 'qwen38-local-qol'
  * legitimately carry different windows, and a shared window would
  * miscalibrate the compaction threshold of the smaller one. The top-level
  * `baseURL`/`model`/`displayName`/`contextWindow`/`maxTokens`/`thinkingBudgets`
- * fields stay authoritative for the adapter (the tab writes them in sync with
- * the active line); `lines` is the per-dialect memory the tab swaps between.
- * The trim knobs (`summarize`) stay shared: they describe model behavior, not
- * the line.
+ * plus `defaultThinkingBudget` and `summarize` stay authoritative at the top
+ * level for the adapter and the compaction backend (the tab writes them in sync
+ * with the active line); `lines` is the per-dialect memory the tab swaps
+ * between — including the thinking budget (a property of the line's server
+ * build, e.g. NInfer's `--default-thinking-budget`) and the trim knobs (a
+ * per-line preference).
  */
 function lineSchema(baseURL, model, contextWindow, maxTokens, budgets) {
   return Schema.object({
@@ -56,6 +58,12 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets) {
       low: Schema.number().default(budgets.low),
       medium: Schema.number().default(budgets.medium),
       xhigh: Schema.number().default(budgets.xhigh),
+    }),
+    defaultThinkingBudget: Schema.number().default(16384),
+    summarize: Schema.object({
+      images: Schema.string().default(DEFAULT_TRIM_KNOBS.images),
+      keepTurns: Schema.number().default(DEFAULT_TRIM_KNOBS.keepTurns),
+      toolChars: Schema.number().default(DEFAULT_TRIM_KNOBS.toolChars),
     }),
   })
 }
@@ -129,6 +137,20 @@ export function validateSection(value) {
     for (const [effort, budgetTokens] of Object.entries(line.thinkingBudgets ?? {})) {
       if (!Number.isInteger(budgetTokens) || budgetTokens <= 0) {
         throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.thinkingBudgets["${effort}"] must be a positive integer, got ${String(budgetTokens)}`)
+      }
+    }
+    const lineDefaultBudget = line.defaultThinkingBudget
+    if (!Number.isInteger(lineDefaultBudget) || lineDefaultBudget <= 0) {
+      throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.defaultThinkingBudget must be a positive integer, got ${String(lineDefaultBudget)}`)
+    }
+    const lineImages = line.summarize?.images
+    if (lineImages !== 'strip' && lineImages !== 'keep') {
+      throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.images must be "strip" or "keep", got "${lineImages}"`)
+    }
+    for (const knob of ['keepTurns', 'toolChars']) {
+      const raw = line.summarize?.[knob]
+      if (!Number.isInteger(raw) || raw < 0) {
+        throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.${knob} must be a non-negative integer, got ${String(raw)}`)
       }
     }
   }

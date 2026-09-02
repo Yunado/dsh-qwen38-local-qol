@@ -141,8 +141,8 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
     model: 'Huihui',
     user: { lines: { ninfer: {}, llamacpp: {} } },
     lines: {
-      ninfer: { baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored', displayName: 'N', contextWindow: 229376, maxTokens: 24576, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 } },
-      llamacpp: { baseURL: 'http://127.0.0.1:8080/v1', model: 'Huihui', displayName: 'L', contextWindow: 131072, maxTokens: 20480, thinkingBudgets: { low: 2048, medium: 4096, xhigh: 8192 } },
+      ninfer: { baseURL: 'http://127.0.0.1:8082/v1', model: 'qwen3.8-27b-nvfp4-uncensored', displayName: 'N', contextWindow: 229376, maxTokens: 24576, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }, defaultThinkingBudget: 8192, summarize: { images: 'keep', keepTurns: 3, toolChars: 1000 } },
+      llamacpp: { baseURL: 'http://127.0.0.1:8080/v1', model: 'Huihui', displayName: 'L', contextWindow: 131072, maxTokens: 20480, thinkingBudgets: { low: 2048, medium: 4096, xhigh: 8192 }, defaultThinkingBudget: 32768 },
     },
   }
   const draft = client.toDraft(value)
@@ -156,6 +156,12 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.low, '2048')
   assert.equal(draft.medium, '4096')
   assert.equal(draft.xhigh, '8192')
+  // The thinking budget and trim knobs follow the line too: active = llama
+  // line's own budget; its trim knobs fall back to the defaults (unset).
+  assert.equal(draft.defaultBudget, '32768')
+  assert.equal(draft.images, 'strip')
+  assert.equal(draft.keepTurns, '5')
+  assert.equal(draft.toolChars, '2000')
   // The parked NInfer line keeps its own numbers.
   assert.equal(draft.parkedBaseURL, 'http://127.0.0.1:8082/v1')
   assert.equal(draft.parkedModel, 'qwen3.8-27b-nvfp4-uncensored')
@@ -163,4 +169,8 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.parkedContextWindow, '229376')
   assert.equal(draft.parkedMaxTokens, '24576')
   assert.equal(draft.parkedXhigh, '16384')
+  assert.equal(draft.parkedDefaultBudget, '8192')
+  assert.equal(draft.parkedImages, 'keep')
+  assert.equal(draft.parkedKeepTurns, '3')
+  assert.equal(draft.parkedToolChars, '1000')
 })

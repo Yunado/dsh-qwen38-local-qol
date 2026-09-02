@@ -109,18 +109,20 @@ The tab, both lines:
 
 - **Per-dialect line memory**: the section persists a `lines` block
   (`lines.ninfer` / `lines.llamacpp`) where each line remembers its own
-  connection (`baseURL` / `model` / `displayName`) **and** its own window
-  numbers (`contextWindow` / `maxTokens` / `thinkingBudgets`). The context
-  window is a property of the line's server build (its `-c`, bounded by that
-  line's VRAM and quantization), not of the model — two lines of the same
-  model may legitimately carry different windows, and a shared window would
-  miscalibrate the compaction threshold of the smaller one. The top-level
-  fields stay the adapter's authority (the tab writes them in sync with the
-  active line), so the host side needs no line awareness; a section saved
-  before `lines` existed is migrated transparently. Switching the line in the
-  tab swaps the two remembered lines; switching back restores the previous
-  line's values. The compaction trim knobs (`summarize`) stay shared: they
-  describe model behavior, not the line.
+  connection (`baseURL` / `model` / `displayName`), its own window numbers
+  (`contextWindow` / `maxTokens` / `thinkingBudgets`), its thinking budget
+  (`defaultThinkingBudget`) and its compaction trim knobs (`summarize`). The
+  context window is a property of the line's server build (its `-c`, bounded
+  by that line's VRAM and quantization), not of the model — two lines of the
+  same model may legitimately carry different windows, and a shared window
+  would miscalibrate the compaction threshold of the smaller one; the
+  thinking budget is the same kind of property (e.g. NInfer's server-side
+  `--default-thinking-budget` cap differs per line), and the trim knobs are a
+  per-line preference. The top-level copies of all of these stay the
+  adapter's authority (the tab writes them in sync with the active line), so
+  the host side needs no line awareness; a section saved before `lines`
+  existed is migrated transparently. Switching the line in the tab swaps the
+  two remembered lines; switching back restores the previous line's values.
 - **Dialect-aware thinking-budget fields**: on the NInfer line the per-effort
   numbers are greyed out (NInfer has no per-request thinking budget —
   ninfer as of 2026-09-02 / ninfer-windows 0.5.0; the values are sent
@@ -325,13 +327,15 @@ tab 实况（两条线）：
 
 - **按方言的线记忆**：section 持久化 `lines` 块（`lines.ninfer` /
   `lines.llamacpp`），每条线记住自己的连接（`baseURL` / `model` /
-  `displayName`）**和**窗口数字（`contextWindow` / `maxTokens` /
-  `thinkingBudgets`）。上下文窗口是线（其服务器的 `-c`，受该线 VRAM 与
+  `displayName`）、窗口数字（`contextWindow` / `maxTokens` /
+  `thinkingBudgets`）、thinking 预算（`defaultThinkingBudget`）和压缩裁剪
+  旋钮（`summarize`）。上下文窗口是线（其服务器的 `-c`，受该线 VRAM 与
   量化约束）的属性，不是模型的属性——同模型的两条线可以合理地不同窗口，
-  共享窗口会把较小那线的压缩阈值算错。顶层字段保持 adapter 权威（tab 与
-  活跃线同步写），所以宿主侧无需线感知；`lines` 出现前保存的 section 透明
-  迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
-  （`summarize`）保持共享：它描述模型行为，不是线的属性。
+  共享窗口会把较小那线的压缩阈值算错；thinking 预算是同类属性（如 NInfer
+  服务端 `--default-thinking-budget` 帽逐线不同），裁剪旋钮是逐线偏好。
+  这些字段的顶层副本保持 adapter 权威（tab 与活跃线同步写），所以宿主侧
+  无需线感知；`lines` 出现前保存的 section 透明迁移。tab 里切线 = 两条
+  记忆互换；切回 = 恢复该线原值。
 - **随方言的 thinking 预算字段**：NInfer 线把按 effort 的数字置灰（NInfer
   没有逐请求 thinking 预算——ninfer as of 2026-09-02 / ninfer-windows 0.5.0；
   数值照发但被忽略），另有一个 **thinking 预算（全部 effort）** 字段记录

@@ -248,6 +248,10 @@ export function toDraft(value) {
       low: String(raw?.thinkingBudgets?.low ?? value.thinkingBudgets?.low ?? 4096),
       medium: String(raw?.thinkingBudgets?.medium ?? value.thinkingBudgets?.medium ?? 8192),
       xhigh: String(raw?.thinkingBudgets?.xhigh ?? value.thinkingBudgets?.xhigh ?? 16384),
+      defaultThinkingBudget: String(raw?.defaultThinkingBudget ?? value.defaultThinkingBudget ?? 16384),
+      images: raw?.summarize?.images ?? value.summarize?.images ?? 'strip',
+      keepTurns: String(raw?.summarize?.keepTurns ?? value.summarize?.keepTurns ?? 5),
+      toolChars: String(raw?.summarize?.toolChars ?? value.summarize?.toolChars ?? 2000),
     }
   }
   const active = legacy
@@ -260,6 +264,10 @@ export function toDraft(value) {
       low: String(value.thinkingBudgets?.low ?? 4096),
       medium: String(value.thinkingBudgets?.medium ?? 8192),
       xhigh: String(value.thinkingBudgets?.xhigh ?? 16384),
+      defaultThinkingBudget: String(value.defaultThinkingBudget ?? 16384),
+      images: value.summarize?.images ?? 'strip',
+      keepTurns: String(value.summarize?.keepTurns ?? 5),
+      toolChars: String(value.summarize?.toolChars ?? 2000),
     }
     : line(dialect)
   const parked = line(other)
@@ -281,10 +289,14 @@ export function toDraft(value) {
     parkedLow: parked.low,
     parkedMedium: parked.medium,
     parkedXhigh: parked.xhigh,
-    defaultBudget: String(value.defaultThinkingBudget ?? 16384),
-    images: value.summarize?.images ?? 'strip',
-    keepTurns: String(value.summarize?.keepTurns ?? 5),
-    toolChars: String(value.summarize?.toolChars ?? 2000),
+    defaultBudget: active.defaultThinkingBudget,
+    images: active.images,
+    keepTurns: active.keepTurns,
+    toolChars: active.toolChars,
+    parkedDefaultBudget: parked.defaultThinkingBudget,
+    parkedImages: parked.images,
+    parkedKeepTurns: parked.keepTurns,
+    parkedToolChars: parked.toolChars,
   }
 }
 
@@ -325,6 +337,14 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
           parkedLow: d.low,
           parkedMedium: d.medium,
           parkedXhigh: d.xhigh,
+          defaultBudget: d.parkedDefaultBudget,
+          images: d.parkedImages,
+          keepTurns: d.parkedKeepTurns,
+          toolChars: d.parkedToolChars,
+          parkedDefaultBudget: d.defaultBudget,
+          parkedImages: d.images,
+          parkedKeepTurns: d.keepTurns,
+          parkedToolChars: d.toolChars,
         },
       }
     })
@@ -350,18 +370,20 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh,
       draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh,
       draft.defaultBudget, draft.keepTurns, draft.toolChars,
+      draft.parkedDefaultBudget, draft.parkedKeepTurns, draft.parkedToolChars,
     ]
     if (numbers.some((text) => /^\d+$/.test(String(text)) === false || Number.parseInt(text, 10) <= 0)) {
       setState((s) => ({ ...s, error: t.invalidNumber }))
       return
     }
     setState((s) => ({ ...s, busy: true, error: null }))
-    // The top-level fields are what the adapter reads (the active line);
-    // `lines` persists both lines — connection AND window numbers (the
-    // context window is a property of the line's server build, not the
-    // model) — so switching dialect and back restores each one's values.
+    // The top-level fields are what the adapter and the compaction backend
+    // read (the active line); `lines` persists both lines — connection, window
+    // numbers, the thinking budget, AND the trim knobs (the context window is a
+    // property of the line's server build, not the model) — so switching
+    // dialect and back restores each one's values.
     const otherDialect = draft.dialect === 'ninfer' ? 'llamacpp' : 'ninfer'
-    const lineBlock = (baseURL, model, displayName, contextWindow, maxTokens, low, medium, xhigh) => ({
+    const lineBlock = (baseURL, model, displayName, contextWindow, maxTokens, low, medium, xhigh, defaultBudget, images, keepTurns, toolChars) => ({
       baseURL,
       model,
       displayName,
@@ -372,6 +394,12 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         medium: Number.parseInt(medium, 10),
         xhigh: Number.parseInt(xhigh, 10),
       },
+      defaultThinkingBudget: Number.parseInt(defaultBudget, 10),
+      summarize: {
+        images,
+        keepTurns: Number.parseInt(keepTurns, 10),
+        toolChars: Number.parseInt(toolChars, 10),
+      },
     })
     const patch = {
       dialect: draft.dialect,
@@ -379,8 +407,8 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       model: draft.model,
       displayName: draft.displayName,
       lines: {
-        [draft.dialect]: lineBlock(draft.baseURL, draft.model, draft.displayName, draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh),
-        [otherDialect]: lineBlock(draft.parkedBaseURL, draft.parkedModel, draft.parkedDisplayName, draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh),
+        [draft.dialect]: lineBlock(draft.baseURL, draft.model, draft.displayName, draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh, draft.defaultBudget, draft.images, draft.keepTurns, draft.toolChars),
+        [otherDialect]: lineBlock(draft.parkedBaseURL, draft.parkedModel, draft.parkedDisplayName, draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh, draft.parkedDefaultBudget, draft.parkedImages, draft.parkedKeepTurns, draft.parkedToolChars),
       },
       contextWindow: Number.parseInt(draft.contextWindow, 10),
       maxTokens: Number.parseInt(draft.maxTokens, 10),
