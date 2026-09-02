@@ -5,12 +5,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resolveConfig, DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_THINKING_BUDGETS } from '../src/config.js'
 
-test('resolveConfig: built-in defaults match the production line', () => {
+test('resolveConfig: built-in defaults open on the general default (llama.cpp line)', () => {
   const resolved = resolveConfig({}, {})
   assert.equal(resolved.baseURL, DEFAULT_BASE_URL)
   assert.equal(resolved.model, DEFAULT_MODEL)
   assert.equal(resolved.apiKey, undefined)
-  assert.equal(resolved.dialect, 'ninfer')
+  assert.equal(resolved.dialect, 'llamacpp')
   assert.equal(resolved.contextWindow, 229376)
   assert.equal(resolved.maxTokens, 24576)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)

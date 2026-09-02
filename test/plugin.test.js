@@ -97,10 +97,12 @@ test('apply: installs the user-settings section; the adapter reads the live reso
     assert.equal(installCalls[0].entry.model, 'qwen3.8-27b-nvfp4-uncensored')
     assert.equal(installCalls[0].entry.contextWindow, 229376)
 
-    // First request: the default production line (budgets from the resolved config).
+    // First request: the default general line (the llama.cpp wire: effort
+    // travels in chat_template_kwargs, the budget rides top-level on both
+    // dialects).
     let sent = await streamOnce('medium')
     assert.equal(sent.model, 'qwen3.8-27b-nvfp4-uncensored')
-    assert.equal(sent.reasoning_effort, 'medium')
+    assert.equal(sent.chat_template_kwargs.reasoning_effort, 'medium')
     assert.equal(sent.reasoning_budget_tokens, 8192)
 
     // A settings change lands in the live source; the next request carries it.
