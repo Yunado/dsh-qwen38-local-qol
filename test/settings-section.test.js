@@ -31,6 +31,7 @@ test('sectionSchema: a fully-default value is the production line', () => {
   assert.equal(resolved.contextWindow, DEFAULT_CONTEXT_WINDOW)
   assert.equal(resolved.maxTokens, DEFAULT_MAX_TOKENS)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
+  assert.equal(resolved.defaultThinkingBudget, 16384)
   assert.equal(resolved.defaultEffort, 'medium')
   assert.deepEqual(resolved.thinkingLevelMap, {})
   assert.equal(resolved.includeUsage, true)
@@ -130,6 +131,11 @@ test('validateSection: off is always a valid defaultEffort', () => {
 test('validateSection: a non-positive budget fails loud', () => {
   const value = { ...sectionSchema()({}), thinkingBudgets: { low: 0, medium: 8192, xhigh: 16384 } }
   assert.throws(() => validateSection(value), /thinkingBudgets\["low"\]/)
+})
+
+test('validateSection: a non-positive defaultThinkingBudget fails loud', () => {
+  const value = { ...sectionSchema()({}), defaultThinkingBudget: 0 }
+  assert.throws(() => validateSection(value), /defaultThinkingBudget must be a positive integer/)
 })
 
 test('validateSection: an unknown summarize.images policy fails loud', () => {

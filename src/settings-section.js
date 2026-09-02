@@ -83,6 +83,7 @@ export function sectionSchema() {
       medium: Schema.number().default(DEFAULT_THINKING_BUDGETS.medium),
       xhigh: Schema.number().default(DEFAULT_THINKING_BUDGETS.xhigh),
     }),
+    defaultThinkingBudget: Schema.number().default(16384),
     defaultEffort: Schema.string().default('medium'),
     thinkingLevelMap: Schema.dict(Schema.string()).default({}),
     includeUsage: Schema.boolean().default(true),
@@ -110,6 +111,9 @@ export function validateSection(value) {
     if (!Number.isInteger(budgetTokens) || budgetTokens <= 0) {
       throw new Error(`dsh-qwen38-local-qol: thinkingBudgets["${effort}"] must be a positive integer, got ${String(budgetTokens)}`)
     }
+  }
+  if (!Number.isInteger(value.defaultThinkingBudget) || value.defaultThinkingBudget <= 0) {
+    throw new Error(`dsh-qwen38-local-qol: defaultThinkingBudget must be a positive integer, got ${String(value.defaultThinkingBudget)}`)
   }
   // The per-line memory carries the same window numbers; validate each line
   // so a hand-edited document cannot park a bad number that later goes live.

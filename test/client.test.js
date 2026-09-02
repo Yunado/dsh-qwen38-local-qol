@@ -120,6 +120,7 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   assert.equal(draft.low, '4096')
   assert.equal(draft.medium, '8192')
   assert.equal(draft.xhigh, '16384')
+  assert.equal(draft.defaultBudget, '16384')
   assert.equal(draft.images, 'strip')
   assert.equal(draft.keepTurns, '5')
   assert.equal(draft.toolChars, '2000')

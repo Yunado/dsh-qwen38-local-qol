@@ -4,11 +4,11 @@
 
 A QoL plugin for DSH (DeepSeek Harness) for people running **Qwen3.8
 locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
-([Neroued/ninfer](https://github.com/Neroued/ninfer), which ships as an
-upstream **Docker** image and a native **Windows build**; both serve the same
-OpenAI-compatible `/v1` API, so one plugin config covers either), and, at the
-config level, **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same
-dialect logic).
+([Neroued/ninfer](https://github.com/Neroued/ninfer): the upstream
+**ninfer 0.5.0** release (Docker image) and **ninfer-windows 0.5.0**
+(native Windows build); both serve the same OpenAI-compatible `/v1` API,
+so one plugin config covers either), and, at the config level,
+**Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
 
 It gives stock DSH (no core patches, no pi-ai patchfile) two things the local
 Qwen line needs:
@@ -64,7 +64,8 @@ fields the patch leaves out):
 | `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` or `llamacpp` (the thinking wire) |
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | declared context capacity (pressure compaction requires it) |
 | `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | declared per-request output cap |
-| `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | per-effort hard thinking budgets; the declared effort vocabulary is `off` + these keys |
+| `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | per-effort hard thinking budgets; the declared effort vocabulary is `off` + these keys (NInfer line: sent but ignored — the effective cap is `defaultThinkingBudget` / the server flag) |
+| `defaultThinkingBudget` | — | `16384` | the NInfer line's effective thinking cap: the server's `--default-thinking-budget` flag value, one value for all efforts (the NInfer endpoint has no per-request budget field). Recorded by the settings tab — keep it in sync with the server startup flags |
 | `defaultEffort` | `DSH_QWEN38_DEFAULT_EFFORT` | `medium` | effort materialized into requests that omit one; must be `off` or a `thinkingBudgets` key. Declaring it (any value) suppresses the core selector's "Default" row, which is redundant with `off` on this line |
 | `thinkingLevelMap` | — | identity | effort id → wire effort name |
 | `includeUsage` | — | `true` | request `stream_options.include_usage`; the context meter and per-turn reasoning-token display read the server-reported usage (both dialects verified to honor it) |
@@ -90,7 +91,9 @@ the settings dialog. The tab exposes the provider config a human actually
 adjusts: the server line selector (llama.cpp / NInfer, i.e. the `dialect`
 field — ports stay out of the labels because they are user-chosen), the
 connection fields (`baseURL`, `model`, `displayName`) **per dialect**,
-`contextWindow`, `maxTokens`, the per-effort `thinkingBudgets`, and the
+`contextWindow`, `maxTokens`, the per-effort `thinkingBudgets` (greyed out on
+the NInfer line) plus the single `defaultThinkingBudget` (NInfer line only),
+and the
 compaction trim knobs (`summarize.images` / `summarize.keepTurns` /
 `summarize.toolChars`) — plus a revision indicator and conflict handling for
 concurrent edits.
@@ -109,11 +112,12 @@ concurrent edits.
   tab swaps the two remembered lines; switching back restores the previous
   line's values. The compaction trim knobs (`summarize`) stay shared: they
   describe model behavior, not the line.
-- **Dialect-aware thinking-budget note**: the tab sends
-  `reasoning_budget_tokens` on both dialects; NInfer has no per-request
-  thinking budget (engine-level; the effective cap is the server's
-  `--default-thinking-budget` flag), while llama.cpp honors the field per
-  request. The hint under the budget fields follows the selected line.
+- **Dialect-aware thinking-budget fields**: on the NInfer line the per-effort
+  numbers are greyed out (NInfer has no per-request thinking budget —
+  ninfer 0.5.0 / ninfer-windows 0.5.0; the values are sent but ignored), and a
+  single **default thinking budget** field records the server's
+  `--default-thinking-budget` flag value (one value for all efforts). On the
+  llama.cpp line the per-effort fields stay live (honored per request).
 - **Fill-once defaults**: every window number (229376 / 24576 /
   4096-8192-16384 per line), the trim knobs (strip / 5 / 2000), and each
   line's production connection (NInfer 8082 + the 27B NVFP4 artifact id;
@@ -215,10 +219,11 @@ settings section.
 # 中文
 
 给**本地跑 Qwen3.8** 的人用的 DSH（DeepSeek Harness）QoL 插件——
-**Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)，
-有原版 **Docker** 镜像与原生 **Windows build** 两种形态；两者都提供同一套
-OpenAI 兼容 `/v1` API，一份插件配置通吃），以及配置层面的
-**Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，同一方言逻辑）。
+**Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)：
+**ninfer 0.5.0** 原版发布（Docker 镜像）与 **ninfer-windows 0.5.0**
+（原生 Windows build）；两者都提供同一套 OpenAI 兼容 `/v1` API，一份插件
+配置通吃），以及配置层面的 **Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，
+同一方言逻辑）。
 
 它给原版 DSH（无核心补丁、无 pi-ai 补丁文件）补上本地 Qwen 线需要的
 两样东西：
@@ -271,7 +276,8 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 | `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` 或 `llamacpp`（thinking wire 方言） |
 | `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | 声明的上下文容量（压力压缩需要它） |
 | `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | 声明的每请求输出帽 |
-| `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | 每档 effort 的 thinking 硬帽；声明的 effort 词汇 = `off` + 这些键 |
+| `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | 每档 effort 的 thinking 硬帽；声明的 effort 词汇 = `off` + 这些键（NInfer 线：发送但被忽略——实际帽 = `defaultThinkingBudget` / 服务端参数） |
+| `defaultThinkingBudget` | — | `16384` | NInfer 线的实际 thinking 帽：服务端 `--default-thinking-budget` 参数值，全部 effort 共用一个值（NInfer 端点无逐请求预算字段）。由设置 tab 记录——与服务器启动参数保持同步 |
 | `defaultEffort` | `DSH_QWEN38_DEFAULT_EFFORT` | `medium` | 注入未带 effort 的请求；必须是 `off` 或 `thinkingBudgets` 键。声明它（任意值）会抑制核心选择器的 "Default" 行——在这条线上它与 `off` 冗余 |
 | `thinkingLevelMap` | — | 恒等 | effort id → wire effort 名 |
 | `includeUsage` | — | `true` | 请求 `stream_options.include_usage`；上下文仪表与逐轮 reasoning token 显示读取服务端报告的 usage（双方言已验证遵守） |
@@ -295,7 +301,8 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 真正会调的 provider 配置：服务器线选择器（llama.cpp / NInfer，即
 `dialect` 字段——标签不带端口，因为端口是用户选的）、**按方言**的连接字段
 （`baseURL`、`model`、`displayName`）、`contextWindow`、`maxTokens`、
-每档 `thinkingBudgets`、压缩裁剪旋钮（`summarize.images` /
+每档 `thinkingBudgets`（NInfer 线置灰）+ 单个 `defaultThinkingBudget`
+（仅 NInfer 线显示）、压缩裁剪旋钮（`summarize.images` /
 `summarize.keepTurns` / `summarize.toolChars`）——外加版本号指示器与并发
 编辑冲突处理。
 
@@ -308,10 +315,11 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
   活跃线同步写），所以宿主侧无需线感知；`lines` 出现前保存的 section 透明
   迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
   （`summarize`）保持共享：它描述模型行为，不是线的属性。
-- **随方言的 thinking 预算注释**：tab 在双方言都发
-  `reasoning_budget_tokens`；NInfer 没有逐请求 thinking 预算（引擎级限制；
-  实际帽 = 服务端 `--default-thinking-budget` 参数），llama.cpp 逐请求
-  遵守此字段。预算字段下的注释跟随所选线。
+- **随方言的 thinking 预算字段**：NInfer 线把按 effort 的数字置灰（NInfer
+  没有逐请求 thinking 预算——ninfer 0.5.0 / ninfer-windows 0.5.0；数值照发
+  但被忽略），另有一个**默认 thinking 预算**字段记录服务端
+  `--default-thinking-budget` 参数值（全部 effort 共用一个值）。llama.cpp
+  线按 effort 的字段保持可用（逐请求生效）。
 - **填一次默认值**：所有窗口数字（每线 229376 / 24576 /
   4096-8192-16384）、裁剪旋钮（strip / 5 / 2000）、每条线的生产连接
   （NInfer 8082 + 27B NVFP4 工件 id；llama.cpp 8080 + GGUF 基名）都是

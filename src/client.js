@@ -36,7 +36,8 @@ const COPY = {
     contextWindow: 'Context window (tokens)',
     maxTokens: 'Output cap (tokens)',
     thinking: 'Thinking budgets',
-    thinkingHintNinfer: 'Not supported by NInfer (upstream Docker or the Windows build): reasoning_budget_tokens is sent but ignored. Effective cap = the server\'s --default-thinking-budget flag; these values only define the client-side effort vocabulary.',
+    thinkingDefault: 'Default thinking budget (all efforts)',
+    thinkingHintNinfer: 'Not supported on NInfer (ninfer 0.5.0 upstream / ninfer-windows 0.5.0): one server-side value applies to all efforts — set the --default-thinking-budget flag at server startup (record it in the field above). The per-effort values below are greyed out: sent but ignored.',
     thinkingHintLlamacpp: 'Hard per-effort thinking-token caps. llama.cpp honors reasoning_budget_tokens per request; the selected level\'s value overrides the server\'s --reasoning-budget flag.',
     compaction: 'Compaction prefill trim',
     summarizeImages: 'Images in the summarizer prefill',
@@ -66,7 +67,8 @@ const COPY = {
     contextWindow: '上下文窗口（token）',
     maxTokens: '输出上限（token）',
     thinking: 'Thinking 预算',
-    thinkingHintNinfer: 'NInfer（原版 Docker 或 Windows build）不支持逐请求 thinking 预算：reasoning_budget_tokens 照发但被忽略。实际帽 = 服务端 --default-thinking-budget 参数；这些值只定义客户端 effort 词汇。',
+    thinkingDefault: '默认 thinking 预算（全部 effort）',
+    thinkingHintNinfer: 'NInfer 不支持逐请求 thinking 预算（ninfer 0.5.0 原版 / ninfer-windows 0.5.0）：一个服务端值对全部 effort 生效——服务器启动参数设 --default-thinking-budget N（记在上方字段）。下方按 effort 的数字已置灰：照发但被忽略。',
     thinkingHintLlamacpp: '各 effort 档的 thinking token 硬帽。llama.cpp 逐请求按所选档携带 reasoning_budget_tokens，覆盖服务端 --reasoning-budget 参数。',
     compaction: '压缩预填充裁剪',
     summarizeImages: '摘要预填充里的图片',
@@ -279,6 +281,7 @@ export function toDraft(value) {
     parkedLow: parked.low,
     parkedMedium: parked.medium,
     parkedXhigh: parked.xhigh,
+    defaultBudget: String(value.defaultThinkingBudget ?? 16384),
     images: value.summarize?.images ?? 'strip',
     keepTurns: String(value.summarize?.keepTurns ?? 5),
     toolChars: String(value.summarize?.toolChars ?? 2000),
@@ -346,7 +349,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     const numbers = [
       draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh,
       draft.parkedContextWindow, draft.parkedMaxTokens, draft.parkedLow, draft.parkedMedium, draft.parkedXhigh,
-      draft.keepTurns, draft.toolChars,
+      draft.defaultBudget, draft.keepTurns, draft.toolChars,
     ]
     if (numbers.some((text) => /^\d+$/.test(String(text)) === false || Number.parseInt(text, 10) <= 0)) {
       setState((s) => ({ ...s, error: t.invalidNumber }))
@@ -386,6 +389,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         medium: Number.parseInt(draft.medium, 10),
         xhigh: Number.parseInt(draft.xhigh, 10),
       },
+      defaultThinkingBudget: Number.parseInt(draft.defaultBudget, 10),
       summarize: {
         images: draft.images,
         keepTurns: Number.parseInt(draft.keepTurns, 10),
@@ -450,11 +454,15 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     ),
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.thinking),
-      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 8 } },
+      draft.dialect === 'ninfer'
+        ? React.createElement(Field, { label: t.thinkingDefault },
+          React.createElement('input', { style: INPUT_STYLE, value: draft.defaultBudget, onChange: (e) => setDraft({ defaultBudget: e.target.value }) }))
+        : null,
+      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 8, opacity: draft.dialect === 'ninfer' ? 0.45 : 1 } },
         ['low', 'medium', 'xhigh'].map((effort) =>
           React.createElement('div', { key: effort, style: { flex: 1 } },
             React.createElement('label', { style: { display: 'block', fontSize: 11, marginBottom: 2, opacity: 0.7 } }, effort),
-            React.createElement('input', { style: INPUT_STYLE, value: draft[effort], onChange: (e) => setDraft({ [effort]: e.target.value }) }),
+            React.createElement('input', { style: INPUT_STYLE, disabled: draft.dialect === 'ninfer', value: draft[effort], onChange: (e) => setDraft({ [effort]: e.target.value }) }),
           ),
         ),
       ),
