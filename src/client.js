@@ -107,21 +107,91 @@ const INPUT_STYLE = {
   color: 'inherit',
 }
 
-// The native <select> control paints its own fill even with a transparent
-// background (the text input does not), which rendered white-on-white on
-// the dark dialog. appearance:none strips the native skin so the control
-// keeps the exact look of the other fields — transparent fill, inherited
-// text color; the dropdown list follows the color-scheme the host writes
-// on <html>, and a neutral chevron stays visible in both themes.
-const SELECT_STYLE = {
-  ...INPUT_STYLE,
-  appearance: 'none',
-  WebkitAppearance: 'none',
-  paddingRight: 26,
-  backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'right 8px center',
-  backgroundSize: '12px',
+/**
+ * Two-choice dropdown matching the host's Menu primitive look: a themed
+ * rounded card (var(--dsw-specific-menu) surface, r12, inverted hairline,
+ * lv3 shadow), theme-aware row hover, a trailing check on the selected
+ * row. The native <select> popup cannot follow the host theme (it stays
+ * white on a dark dialog), so the control is a button + an absolute card
+ * instead — the same construction the host's own settings rows use.
+ */
+function ThemeSelect({ value, options, onChange }) {
+  const [open, setOpen] = React.useState(false)
+  const [hovered, setHovered] = React.useState(-1)
+  const rootRef = React.useRef(null)
+  const selected = options.find((option) => option.value === value) ?? options[0]
+
+  React.useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event) => {
+      if (rootRef.current !== null && !rootRef.current.contains(event.target)) setOpen(false)
+    }
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return React.createElement('div', { ref: rootRef, style: { position: 'relative' } },
+    React.createElement('button', {
+      type: 'button',
+      'aria-haspopup': 'listbox',
+      'aria-expanded': open,
+      onClick: () => setOpen(!open),
+      style: { ...INPUT_STYLE, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, cursor: 'pointer', textAlign: 'left' },
+    },
+      React.createElement('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected.label),
+      React.createElement('svg', {
+        width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+        style: { flex: 'none', opacity: 0.6 },
+      },
+        React.createElement('path', { d: 'M6 9l6 6 6-6' }),
+      ),
+    ),
+    open
+      ? React.createElement('div', {
+        role: 'listbox',
+        style: {
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+          padding: 4, boxSizing: 'border-box',
+          border: '1px solid var(--dsw-alias-border-inverted, rgba(128, 128, 128, 0.2))',
+          borderRadius: 12,
+          background: 'var(--dsw-specific-menu, #ffffff)',
+          boxShadow: 'var(--dsw-shadow-lv3, 0 8px 24px rgba(0, 0, 0, 0.24))',
+        },
+      },
+        options.map((option, index) =>
+          React.createElement('button', {
+            key: option.value,
+            type: 'button',
+            role: 'option',
+            'aria-selected': option.value === value,
+            onClick: () => { onChange(option.value); setOpen(false); setHovered(-1) },
+            onMouseEnter: () => setHovered(index),
+            onMouseLeave: () => setHovered(-1),
+            style: {
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              width: '100%', minHeight: 40, padding: '8px 10px', boxSizing: 'border-box',
+              border: 'none', borderRadius: 10, cursor: 'pointer',
+              fontSize: 13, fontFamily: 'inherit', textAlign: 'left', color: 'inherit',
+              background: hovered === index
+                ? 'var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12))'
+                : 'transparent',
+            },
+          },
+            option.label,
+            option.value === value ? React.createElement('span', { style: { flex: 'none', fontSize: 12 } }, '✓') : null,
+          ),
+        ),
+      )
+      : null,
+  )
 }
 
 const BUTTON_STYLE = {
@@ -393,10 +463,11 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     React.createElement('div', null,
       React.createElement('div', { style: { fontSize: 12, marginBottom: 4, opacity: 0.75 } }, t.compaction),
       React.createElement(Field, { label: t.summarizeImages },
-        React.createElement('select', { style: SELECT_STYLE, value: draft.images, onChange: (e) => setDraft({ images: e.target.value }) },
-          React.createElement('option', { value: 'strip' }, t.strip),
-          React.createElement('option', { value: 'keep' }, t.keep),
-        )),
+        React.createElement(ThemeSelect, {
+          value: draft.images,
+          options: [{ value: 'strip', label: t.strip }, { value: 'keep', label: t.keep }],
+          onChange: (images) => setDraft({ images }),
+        })),
       React.createElement('div', { style: { display: 'flex', gap: 8 } },
         React.createElement('div', { style: { flex: 1 } },
           React.createElement(Field, { label: t.keepTurns },
