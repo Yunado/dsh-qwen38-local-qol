@@ -4,10 +4,10 @@
 
 A QoL plugin for DSH (DeepSeek Harness) for people running **Qwen3.8
 locally** — **Qwen3.8-27B** on llama.cpp `llama-server` or on NInfer
-([Neroued/ninfer](https://github.com/Neroued/ninfer): the upstream build —
-source / Docker image, no versioned releases as of 2026-09-02 — and the
-**ninfer-windows 0.5.0** native Windows build; both serve the same
-OpenAI-compatible `/v1` API, so one plugin config covers either), and, at the
+([Neroued/ninfer](https://github.com/Neroued/ninfer) — source build or
+self-built Docker image, as of 2026-09-02 — and the **ninfer-windows 0.5.0**
+native Windows build; both serve the same OpenAI-compatible `/v1` API, so one
+plugin config covers either), and, at the
 **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
 
 It gives stock DSH (no core patches, no pi-ai patchfile) two things the local
@@ -78,7 +78,7 @@ stock config schema does not know):
 |---|---|---|
 | `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` reduces image blocks to text placeholders — **prefer this when the vision mmproj is offloaded to a second device** (common local setups, e.g. llama.cpp `--mmproj-device <iGPU>`): the summarizer then never re-encodes images on the offload device. `keep` retains them so the checkpoint can describe the pixels (every compaction re-encodes the images — slower + vision tokens) |
 | `DSH_QWEN38_SUMMARIZE_KEEP_TURNS` | `5` | assistant turns at the region tail whose reasoning is kept |
-| `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | per-tool-result character cap; `0` disables |
+| `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | per-tool-result character cap (JS string length: one CJK character = one ASCII letter = 1 — characters, not tokens); `0` disables |
 
 The generated preset pins the backend row's `maxTokens` to `16384` (the stock
 8192 default is the cap thinking used to eat before this backend existed).
@@ -114,7 +114,7 @@ concurrent edits.
   describe model behavior, not the line.
 - **Dialect-aware thinking-budget fields**: on the NInfer line the per-effort
   numbers are greyed out (NInfer has no per-request thinking budget —
-  upstream ninfer, unversioned as of 2026-09-02 / ninfer-windows 0.5.0; the values are sent
+  ninfer as of 2026-09-02 / ninfer-windows 0.5.0; the values are sent
   but ignored), and a single **thinking-budget (all efforts)** field records
   the server's `--default-thinking-budget` flag value — keep the two in sync.
   On the llama.cpp line the per-effort fields stay live (honored per request).
@@ -219,9 +219,9 @@ settings section.
 # 中文
 
 给**本地跑 Qwen3.8** 的人用的 DSH（DeepSeek Harness）QoL 插件——
-**Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)：
-上游构建——源码 / Docker 镜像，截至 2026-09-02 无版本化发布——与 **ninfer-windows 0.5.0**
-（原生 Windows build）；两者都提供同一套 OpenAI 兼容 `/v1` API，一份插件
+**Qwen3.8-27B** 跑在 llama.cpp `llama-server` 或 NInfer（[Neroued/ninfer](https://github.com/Neroued/ninfer)——源码构建
+或自构 Docker 镜像，as of 2026-09-02——与 **ninfer-windows 0.5.0**（原生
+Windows build）；两者都提供同一套 OpenAI 兼容 `/v1` API，一份插件
 配置通吃），以及配置层面的 **Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，
 同一方言逻辑）。
 
@@ -289,7 +289,7 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
 |---|---|---|
 | `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` 把图片块降为文本占位符——**vision mmproj offload 到第二设备时优选**（常见本地配置，如 llama.cpp `--mmproj-device <iGPU>`）：摘要器不再在离卡设备上重编码图片。`keep` 保留，checkpoint 能描述像素（每次压缩都重编码——更慢 + 视觉 token 开销） |
 | `DSH_QWEN38_SUMMARIZE_KEEP_TURNS` | `5` | 区域尾部保留 reasoning 的 assistant 轮数 |
-| `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | 单条工具结果字符帽；`0` 禁用 |
+| `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | 单条工具结果字符帽（JS 字符串长度：一个中文字 = 一个英文字母 = 1——是字符不是 token）；`0` 禁用 |
 
 生成的 preset 把后端行的 `maxTokens` 钉在 `16384`（原版 8192 默认帽是
 此前 thinking 吃满输出帽的元凶）。
@@ -316,7 +316,7 @@ config 对象，所以环境回退只作用于补丁没写的字段）：
   迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
   （`summarize`）保持共享：它描述模型行为，不是线的属性。
 - **随方言的 thinking 预算字段**：NInfer 线把按 effort 的数字置灰（NInfer
-  没有逐请求 thinking 预算——上游 ninfer 截至 2026-09-02 无版本号 / ninfer-windows 0.5.0；
+  没有逐请求 thinking 预算——ninfer as of 2026-09-02 / ninfer-windows 0.5.0；
   数值照发但被忽略），另有一个 **thinking 预算（全部 effort）** 字段记录
   服务端 `--default-thinking-budget` 参数值——两者保持同步。llama.cpp
   线按 effort 的字段保持可用（逐请求生效）。
