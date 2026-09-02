@@ -1,5 +1,7 @@
 # dsh-qwen38-local-qol
 
+[English](#dsh-qwen38-local-qol) · [中文](#中文)
+
 DeepSeek Harness QoL plugin for the local Qwen3.8 line — **Qwen3.8-27B**
 (llama.cpp `llama-server` or NInfer) and, at the config level,
 **Qwen3.8-Flash-Next** (same OpenAI-compatible wire, same dialect logic).
@@ -208,3 +210,184 @@ settings section.
 - **Default preset.** The generated preset is selected per session in the
   GUI, or made the default with the user setting
   `agent-presets: { default: qwen38-qol }` in `settings.yaml`.
+
+---
+
+# 中文
+
+DeepSeek Harness 本地 Qwen3.8 线的 QoL 插件——**Qwen3.8-27B**
+（llama.cpp `llama-server` 或 NInfer）以及配置层面的
+**Qwen3.8-Flash-Next**（同一 OpenAI 兼容 wire，同一方言逻辑）。
+
+它给原版 DSH（无核心补丁、无 pi-ai 补丁文件）补上本地 Qwen 线需要的
+两样东西：
+
+1. **逐请求 thinking 预算。** 每个请求携带所选 reasoning effort 及其
+   thinking token 硬帽：`llamacpp` 方言发 `chat_template_kwargs.reasoning_effort`
+   + 顶层 `reasoning_budget_tokens`（llama.cpp 的逐请求预算，覆盖任何
+   `--reasoning-budget` CLI 参数）；`ninfer` 方言发顶层 `reasoning_effort`
+   （NInfer 0.5.0 的 effort 白名单；预算字段照发但服务端用
+   `--default-thinking-budget` 帽住 thinking）。`off` 发
+   `chat_template_kwargs.enable_thinking: false`——这个 llama.cpp 构建
+   实际读取的开关。
+2. **不再把输出帽烧在 thinking 上的压缩（compaction）后端。** 覆盖原版
+   引擎唯一的 `summarize()` 钩子：摘要 prefill 先裁剪（只留近期
+   reasoning、图片剔除、工具结果截断），一次性调用保持 thinking 关闭——
+   checkpoint 拿到完整输出帽，而不是被截断的 "incomplete checkpoint"。
+
+一个包，三处注册：
+
+| 注册 | 接缝 | 挂载点 |
+|---|---|---|
+| `QwenLocalAdapter`（provider 路由 `qwen38`） | `ctx.llm.registerAdapter()` | bundle 补丁（`cordis.patch.yml`），挂在 profile 根 |
+| `QwenLocalCompaction`（压缩后端） | `@deepseek-ai/dsh-compaction-basic` 子类 | 生成的**用户 preset** `~/.dsh/.agent-presets/qwen38-qol/agent.cordis.yml`（每会话 agent preset 拥有隔离的压缩组；profile 级补丁够不到） |
+| 设置 tab（**Qwen3.8 本地**） | 用户设置命名空间 `qwen38-local-qol` + 浏览器 `settings.section` 槽位 | settings provider 的 `installSection`（宿主侧）与插件的 `dsh.client` manifest（浏览器侧，`./client` 导出） |
+
+## 安装
+
+```sh
+dsh plugin add github:Yunado/dsh-qwen38-local-qol
+# 从已安装的 standard preset 生成用户 preset（重跑会留日期备份）：
+node_modules/dsh-qwen38-local-qol/src/setup.js --src <已安装的 @deepseek-ai/dsh-agent-presets 的 presets/standard/agent.cordis.yml 路径>
+```
+
+然后在 GUI 里选择 **`qwen38-qol`** agent preset（每会话）。
+
+`dsh --profile <name> --patch <plugin>/cordis.patch.yml --dump-config`
+可在不启动的情况下查看组合后的 provider 行。
+
+## 配置
+
+provider 行配置（来自 bundle 补丁或 overlay；按 id 定向的补丁替换整个
+config 对象，所以环境回退只作用于补丁没写的字段）：
+
+| 字段 | 环境回退 | 默认值 | 含义 |
+|---|---|---|---|
+| `baseURL` | `DSH_QWEN38_BASE_URL` | `http://127.0.0.1:8082/v1` | 服务器地址（含 `/v1`） |
+| `model` | `DSH_QWEN38_MODEL` | `qwen3.8-27b-nvfp4-uncensored` | 请求未带 model 时发送的 id（NInfer 0.5.0 工件 id；llama.cpp 线用自己的 id——在那边设此字段或环境变量） |
+| `displayName` | `DSH_QWEN38_DISPLAY_NAME` | model id | GUI 模型选择器的可读名（wire id 是工件别名） |
+| `apiKey` | `DSH_QWEN38_API_KEY` | — | 服务器 `--api-key`（如设置） |
+| `dialect` | `DSH_QWEN38_DIALECT` | `ninfer` | `ninfer` 或 `llamacpp`（thinking wire 方言） |
+| `contextWindow` | `DSH_QWEN38_CONTEXT_WINDOW` | `229376` | 声明的上下文容量（压力压缩需要它） |
+| `maxTokens` | `DSH_QWEN38_MAX_TOKENS` | `24576` | 声明的每请求输出帽 |
+| `thinkingBudgets` | — | `{ low: 4096, medium: 8192, xhigh: 16384 }` | 每档 effort 的 thinking 硬帽；声明的 effort 词汇 = `off` + 这些键 |
+| `defaultEffort` | `DSH_QWEN38_DEFAULT_EFFORT` | `medium` | 注入未带 effort 的请求；必须是 `off` 或 `thinkingBudgets` 键。声明它（任意值）会抑制核心选择器的 "Default" 行——在这条线上它与 `off` 冗余 |
+| `thinkingLevelMap` | — | 恒等 | effort id → wire effort 名 |
+| `includeUsage` | — | `true` | 请求 `stream_options.include_usage`；上下文仪表与逐轮 reasoning token 显示读取服务端报告的 usage（双方言已验证遵守） |
+| `provider` | — | `["qwen38"]` | 要注册的 provider 路由 |
+
+压缩裁剪旋钮（仅环境变量，让 preset 行不携带原版 config schema 不认识的键）：
+
+| 环境变量 | 默认值 | 含义 |
+|---|---|---|
+| `DSH_QWEN38_SUMMARIZE_IMAGES` | `strip` | `strip` 把图片块降为文本占位符；`keep` 保留 |
+| `DSH_QWEN38_SUMMARIZE_KEEP_TURNS` | `5` | 区域尾部保留 reasoning 的 assistant 轮数 |
+| `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` | `2000` | 单条工具结果字符帽；`0` 禁用 |
+
+生成的 preset 把后端行的 `maxTokens` 钉在 `16384`（原版 8192 默认帽是
+此前 thinking 吃满输出帽的元凶）。
+
+## 设置 tab
+
+在带 settings provider 的 profile（web 面）上，插件注册用户设置命名空间
+`qwen38-local-qol`，并在设置弹窗里注册 **Qwen3.8 本地** 页。tab 暴露人
+真正会调的 provider 配置：服务器线选择器（llama.cpp / NInfer，即
+`dialect` 字段——标签不带端口，因为端口是用户选的）、**按方言**的连接字段
+（`baseURL`、`model`、`displayName`）、`contextWindow`、`maxTokens`、
+每档 `thinkingBudgets`、压缩裁剪旋钮（`summarize.images` /
+`summarize.keepTurns` / `summarize.toolChars`）——外加版本号指示器与并发
+编辑冲突处理。
+
+- **按方言的线记忆**：section 持久化 `lines` 块（`lines.ninfer` /
+  `lines.llamacpp`），每条线记住自己的连接（`baseURL` / `model` /
+  `displayName`）**和**窗口数字（`contextWindow` / `maxTokens` /
+  `thinkingBudgets`）。上下文窗口是线（其服务器的 `-c`，受该线 VRAM 与
+  量化约束）的属性，不是模型的属性——同模型的两条线可以合理地不同窗口，
+  共享窗口会把较小那线的压缩阈值算错。顶层字段保持 adapter 权威（tab 与
+  活跃线同步写），所以宿主侧无需线感知；`lines` 出现前保存的 section 透明
+  迁移。tab 里切线 = 两条记忆互换；切回 = 恢复该线原值。压缩裁剪旋钮
+  （`summarize`）保持共享：它描述模型行为，不是线的属性。
+- **随方言的 thinking 预算注释**：tab 在双方言都发
+  `reasoning_budget_tokens`，但 NInfer 完全不支持逐请求 thinking 预算——
+  其 OpenAI 端点没有此字段（引擎源码验证；帽 = 服务端
+  `--default-thinking-budget` 参数）。NInfer 是 from-scratch C++/CUDA
+  引擎（[Neroued/ninfer](https://github.com/Neroued/ninfer)），不是
+  llama.cpp fork，所以限制是引擎级的，不是构建产物。llama.cpp 逐请求
+  遵守此字段（所选档的值覆盖 `--reasoning-budget`）。预算字段下的注释
+  跟随所选线，说的正是这件事。
+- **填一次默认值**：所有窗口数字（每线 229376 / 24576 /
+  4096-8192-16384）、裁剪旋钮（strip / 5 / 2000）、每条线的生产连接
+  （NInfer 8082 + 27B NVFP4 工件 id；llama.cpp 8080 + GGUF 基名）都是
+  schema 默认值——新安装整表预填，只需填与默认不同的字段。`includeUsage`
+  （默认 `true`）与 `defaultEffort`（默认 `medium`）刻意**不是** tab
+  控件——留在 schema/config 层（补丁行/环境），在专用本地线上按设计
+  关闭。
+- **持久化** = 设置文档（`settings.yaml`，热加载）；写路径携带命名空间
+  版本号，过期写入表现为冲突（重读），绝不静默覆盖。
+- **生效即时、免重启**：adapter 每请求读解析值，压缩后端每次 summarize
+  读——保存的改动在下一次 wire 调用生效。（*新的聊天会话*仍需要于模型
+  目录字段——`contextWindow` / `maxTokens` / `displayName` 在会话开始时
+  解析。）
+- **优先级**：设置 tab（用户层）→ 补丁行/环境 → 内置默认值。无 settings
+  provider（headless profile）时，上表的行/环境/默认链仍生效，裁剪旋钮
+  回退到环境变量。
+- **注册是声明式注入，不是 store 读取**：apply 体用
+  `ctx.inject(['settings'], …)`（和 `ctx.inject(['attachments'], …)`）
+  而不是 `ctx.get(…)`。apply 时的 store 读取与启动顺序竞争——本插件 apply
+  先于 settings provider 注册服务运行时，section 会静默装不上
+  （llm-pi-ai / tool-fs / agent-loop 先例是声明注入形式；缺失的可选服务
+  让子 fiber 保持 pending 而非失败）。
+
+## Wire 对照
+
+双方言都讲 OpenAI 兼容 `/v1/chat/completions`：
+
+- `max_tokens`（不是 `max_completion_tokens`）、标准 `tools` 数组、`stop`。
+- assistant reasoning 往返走标准 `reasoning_content` 字段（#1198 加固：
+  无签名 thinking 块不再被静默丢弃）。
+- `finish_reason: length` → harness `max-tokens`（预算或输出截断不表现为
+  完整回答）。
+- usage：`completion_tokens_details.reasoning_tokens` → GUI 逐轮
+  reasoning tokens（服务端报告时；llama.cpp reasoning-budget 构建报告；
+  NInfer 0.5.0 在 `stream_options.include_usage` 下报告——2026-09 验证；
+  该字段处处可选）。
+- 用户图片块 → 经 attachment 接缝的 `image_url` data URL；读不到的图降为
+  `[image: name w×h]` 文本占位——单个 store 条目缺失从不搞挂请求。
+- token 仪表图片计价（`imageRequestPricing`，同步、无 I/O）：NInfer 线用
+  其精确 patch 公式 `(W/32)×(H/32)+2` 视觉 token；llama.cpp 线被服务端
+  钳在 `--image-min-tokens`/`--image-max-tokens` 窗口内，所以每张图都按
+  钳位上限（1536）计价——保守上界。adapter 自带该方法，因为 rc.2
+  `LlmAdapter` 基类早于该接缝、而新版 token 仪表无守卫地解析它。
+
+## 开发
+
+```sh
+pnpm install
+pnpm test              # node --test（host + client + 构建产物）
+pnpm run build:client  # 改完 src/client.js 后重建 lib/client.js
+```
+
+宿主半边是带 JSDoc 的裸 ESM JavaScript（dsh-llamacpp 的出货模式）。
+浏览器半边（`src/client.js`）是 `React.createElement` 源码，由
+`scripts/build-client.mjs`（esbuild，`react` external）构建为 DSH client
+模块格式——web loader 作为经典脚本执行的自注册脚本——以已提交的
+`lib/client.js` 出货。`src/client.js` 任何改动后重建并提交。Peer 钉版：
+`@deepseek-ai/cordis ^4.0.1`、`@deepseek-ai/dsh-llm ^0.1.1-rc.2`（对 npm
+0.1.1-rc.2 线验证；在 0.1.2-alpha.3 源码树上开发与机器验证），设置
+section 另有 `@deepseek-ai/schemastery ^3.18.1` 与 `react ^18.2.0`。
+
+## 已知限制与暂缓工作
+
+- **Flash-Next 是配置兼容，未工件验证。** 同一 wire 与方言逻辑；NInfer
+  Flash-Next 工件尚不存在（0.5.0 只出 27B NVFP4），所以 Flash-Next 跑在
+  `llamacpp` 方言（Unsloth `qwen4exp` 分支），用自己的
+  `contextWindow`/预算值。
+- **rc.2 摘要器行为。** 后端自己裁 prefill，一次性调用委托给原版引擎路径；
+  若已安装的 compaction-basic 早于原版 `reasoningEffort: off` 摘要器，
+  压缩 thinking-off 取决于引擎那次调用而非本插件。Alpha.3 起无条件发送。
+- **preset 接缝是 web 面功能。** headless profile 不挂 `agent-presets`
+  行，其会话是裸 agent，生成的 preset 压缩后端在那里不生效；provider 路由
+  两面都工作。上游为 headless 打开 preset/settings 接缝之前，headless
+  用户的压缩改动保留在核心补丁链上。
+- **默认 preset。** 生成的 preset 在 GUI 里每会话选择，或在 `settings.yaml`
+  里用用户设置 `agent-presets: { default: qwen38-qol }` 设为默认。
