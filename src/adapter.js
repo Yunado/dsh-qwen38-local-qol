@@ -338,7 +338,11 @@ function assertRepresentable(options) {
       continue
     }
     for (const block of message.content ?? []) {
-      if (block.type === 'text' || block.type === 'image' || block.type === 'tool-result') continue
+      // A reasoning block on a non-assistant message is context, not wire
+      // content: the projection drops it (subagent-settled notices embed the
+      // child's closing thinking; compaction checkpoints can carry the
+      // summarizer's).
+      if (block.type === 'text' || block.type === 'image' || block.type === 'tool-result' || block.type === 'reasoning') continue
       throw new LlmError(
         `dsh-qwen38-local-qol: cannot send a "${block.type}" content block to the local Qwen3.8 server`,
         UNSUPPORTED_CONTENT_CODE,

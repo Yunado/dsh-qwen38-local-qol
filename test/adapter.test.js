@@ -191,6 +191,37 @@ test('stream: an assistant image block is refused before any wire traffic', asyn
   assert.equal(called, false)
 })
 
+test('stream: a user-side reasoning block (subagent-settled notice) is dropped, not refused', async () => {
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+    'data: [DONE]\n\n',
+  ]
+  const { fetch, requests } = fakeFetch(sseResponse(frames))
+  const adapter = new QwenLocalAdapter({ ...CONFIG, fetch })
+  const settledOptions = {
+    ...options(),
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Background subagent abc finished.' },
+        { type: 'text', text: 'Its closing message:' },
+        { type: 'reasoning', text: 'The report has been accepted.\n' },
+        { type: 'text', text: 'report body' },
+      ],
+    }],
+  }
+  const chunks = []
+  for await (const chunk of adapter.stream(settledOptions)) chunks.push(chunk)
+  assert.equal(chunks.at(-1).type, 'finish')
+  const sent = JSON.parse(requests[0].init.body)
+  const userMessage = sent.messages.find((message) => message.role === 'user')
+  assert.equal(typeof userMessage.content, 'string')
+  assert.ok(userMessage.content.includes('Background subagent abc finished.'))
+  assert.ok(userMessage.content.includes('report body'))
+  assert.ok(!userMessage.content.includes('The report has been accepted'))
+})
+
 test('stream: user image blocks resolve to image_url data URLs through the attachment service', async () => {
   const pngBytes = new Uint8Array([137, 80, 78, 73, 13, 10, 26, 10])
   const ref = { attachmentId: 'att-1', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'x.png' }
