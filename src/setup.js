@@ -42,10 +42,10 @@
  *
  * @module dsh-qwen38-local-qol/setup
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 /** The user preset directory, relative to the DSH home (`.agent-presets`). */
 export const USER_PRESET_DIR = '.agent-presets'
@@ -270,15 +270,41 @@ export function readCompactionStatus(dshHome) {
  */
 function writeIfChanged(path, text) {
   if (existsSync(path) && readFileSync(path, 'utf8') === text) return
-  if (existsSync(path)) copyFileSync(path, `${path}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+  if (existsSync(path)) {
+    // A collision (two changes inside one millisecond) gets a short random
+    // suffix so two distinct states never share one backup name.
+    let backup = `${path}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`
+    while (existsSync(backup)) backup += `-x${Math.random().toString(36).slice(2, 6)}`
+    copyFileSync(path, backup)
+  }
   writeFileSync(path, text)
+  pruneBackups(path)
+}
+
+/** The number of dated `.bak-` files kept per generated file; older ones are pruned at each backup so a long-lived preset directory does not crowd. */
+export const BACKUP_KEEP = 5
+
+/**
+ * Keep only the newest `BACKUP_KEEP` dated backups of `path`. Backup names
+ * embed an ISO timestamp (`<file>.bak-<ts>`), so lexicographic order is
+ * chronological and everything beyond the newest `BACKUP_KEEP` is deleted.
+ * @param path - the generated file whose backups are pruned.
+ */
+function pruneBackups(path) {
+  const dir = dirname(path)
+  const prefix = `${basename(path)}.bak-`
+  const backups = readdirSync(dir)
+    .filter((name) => name.startsWith(prefix))
+    .sort()
+  for (const name of backups.slice(0, -BACKUP_KEEP)) unlinkSync(join(dir, name))
 }
 
 /**
  * Transform the standard composition and write the generated preset files
  * (composition + display metadata) into the DSH home. Only files whose
  * content actually changed are written, and only those get a dated `.bak-`
- * backup — a re-run with the same standard composition is a no-op.
+ * backup (the newest `BACKUP_KEEP` are kept, older ones pruned) — a re-run
+ * with the same standard composition is a no-op.
  * @param dshHome - the DSH home directory.
  * @param sourceText - the standard preset's composition text.
  * @param options - the write behavior.

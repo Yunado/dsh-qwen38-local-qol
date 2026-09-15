@@ -251,6 +251,24 @@ test('autoApplyCompaction: first run generates and sets the default; re-runs and
   }
 })
 
+test('writeGeneratedPreset: keeps only the newest five dated backups', () => {
+  const home = mkdtempSync(join(tmpdir(), 'qol-backup-prune-'))
+  try {
+    writeGeneratedPreset(home, PRESET, { overwrite: true })
+    for (let i = 1; i <= 7; i += 1) {
+      writeGeneratedPreset(home, `${PRESET}\n# cut ${i}\n`, { overwrite: true })
+    }
+    const dir = join(home, '.agent-presets', 'qwen38')
+    const backups = readdirSync(dir).filter((name) => name.includes('.bak-')).sort()
+    assert.equal(backups.length, 5)
+    // The latest content survives; the pruned ones are the oldest cuts.
+    assert.match(readFileSync(join(dir, 'agent.cordis.yml'), 'utf8'), /# cut 7/)
+    assert.match(backups[4], /agent\.cordis\.yml\.bak-/)
+  } finally {
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
 test('autoApplyCompaction: a changed standard composition regenerates the existing preset with a dated backup', () => {
   const home = mkdtempSync(join(tmpdir(), 'qol-auto-apply-resync-'))
   const source = join(home, 'standard.cordis.yml')
