@@ -305,12 +305,12 @@ export class QwenLocalAdapter extends LlmAdapter {
 async function resolveImageDataUrls(attachment, options) {
   const urls = new Map()
   if (attachment === undefined || typeof attachment.readImage !== 'function') return urls
-  const visit = (block) => {
+  const visit = async (block) => {
     if (block.type === 'image') {
-      visitImage(block)
+      await visitImage(block)
       return
     }
-    if (block.type === 'tool-result') for (const inner of block.content ?? []) visit(inner)
+    if (block.type === 'tool-result') for (const inner of block.content ?? []) await visit(inner)
   }
   const visitImage = async (block) => {
     try {
@@ -322,7 +322,7 @@ async function resolveImageDataUrls(attachment, options) {
     }
   }
   for (const message of options.messages ?? []) {
-    for (const block of message.content ?? []) visit(block)
+    for (const block of message.content ?? []) await visit(block)
   }
   return urls
 }
