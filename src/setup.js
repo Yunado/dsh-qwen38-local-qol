@@ -27,9 +27,10 @@
  * preset new sessions default to.
  *
  * The plugin also self-applies this wiring at every DSH start (see
- * {@link autoApplyCompaction}): a missing generated preset regenerates from
- * the standard preset's composition, and the default is set only when none
- * is configured yet. The CLI remains for a manual re-run.
+ * {@link autoApplyCompaction}): the generated preset re-derives from the
+ * standard preset's composition on every start (regenerating, with a dated
+ * backup, when the standard composition changed), and the default is set
+ * only when none is configured yet. The CLI remains for a manual re-run.
  *
  * Usage:
  *   node src/setup.js [--src <preset agent.cordis.yml>]
@@ -281,10 +282,10 @@ function writeIfChanged(path, text) {
  * @param dshHome - the DSH home directory.
  * @param sourceText - the standard preset's composition text.
  * @param options - the write behavior.
- * @param options.overwrite - when true (the CLI re-run path) changed existing
- *   preset files are backed up and replaced, unchanged ones are left as-is;
- *   when false (the boot auto-apply path) an existing preset fails the write
- *   instead of being touched.
+ * @param options.overwrite - when true (the CLI and the boot auto-apply
+ *   paths) changed existing preset files are backed up and replaced,
+ *   unchanged ones are left as-is; when false an existing preset fails the
+ *   write instead of being touched.
  * @returns the written preset and metadata paths.
  * @throws {Error} when the preset already exists and overwrite is false.
  */
@@ -349,10 +350,13 @@ export function resolveStandardSource(dshHome) {
 
 /**
  * Self-apply the compaction wiring (the setup CLI's one-shot, made
- * automatic): generate the user preset from the standard preset's
- * composition when it is missing, and set the default agent preset only when
- * no default is configured yet — an explicit user choice (any value) is
- * respected on every later boot. Idempotent: an existing preset and an
+ * automatic): re-derive the user preset from the standard preset's
+ * composition on every start — when the standard composition changed since
+ * the last generation the preset is regenerated (only files whose content
+ * actually changed are written, each with a dated backup), and an unchanged
+ * content is left untouched. Set the default agent preset only when no
+ * default is configured yet — an explicit user choice (any value) is
+ * respected on every later start. Idempotent: an unchanged preset and an
  * existing default are left untouched.
  * @param dshHome - the DSH home directory.
  * @returns what changed: `applied` (the preset was generated this call), the
@@ -363,14 +367,20 @@ export function resolveStandardSource(dshHome) {
  */
 export function autoApplyCompaction(dshHome) {
   const presetFile = join(dshHome, USER_PRESET_DIR, PRESET_ID, 'agent.cordis.yml')
+  const existed = existsSync(presetFile)
   let applied = false
   let preset
   let metadata
-  if (!existsSync(presetFile)) {
-    const written = writeGeneratedPreset(dshHome, readFileSync(resolveStandardSource(dshHome), 'utf8'), { overwrite: false })
+  try {
+    const written = writeGeneratedPreset(dshHome, readFileSync(resolveStandardSource(dshHome), 'utf8'), { overwrite: true })
     preset = written.preset
     metadata = written.metadata
-    applied = true
+    applied = !existed
+  } catch (error) {
+    if (!existed) throw error
+    // Unresolvable standard source (a profile without the preset feature):
+    // the existing preset stays as is; a missing preset stays missing (the
+    // status dot answers from the read below).
   }
   // The lenient read answers undefined for a missing or key-less block; an
   // explicit default (any value) is respected and never replaced at boot.

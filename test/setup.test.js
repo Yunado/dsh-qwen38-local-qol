@@ -250,3 +250,33 @@ test('autoApplyCompaction: first run generates and sets the default; re-runs and
     rmSync(home, { recursive: true, force: true })
   }
 })
+
+test('autoApplyCompaction: a changed standard composition regenerates the existing preset with a dated backup', () => {
+  const home = mkdtempSync(join(tmpdir(), 'qol-auto-apply-resync-'))
+  const source = join(home, 'standard.cordis.yml')
+  writeFileSync(source, PRESET)
+  const realSource = process.env.DSH_QWEN38_PRESET_SRC
+  process.env.DSH_QWEN38_PRESET_SRC = source
+  try {
+    const first = autoApplyCompaction(home)
+    assert.equal(first.applied, true)
+    const presetFile = join(home, '.agent-presets', 'qwen38', 'agent.cordis.yml')
+    const unchanged = autoApplyCompaction(home)
+    assert.equal(unchanged.applied, false)
+    assert.deepEqual(readdirSync(dirname(presetFile)).filter((name) => name.includes('.bak-')), [])
+    // A changed standard composition: the preset is regenerated, and only the
+    // changed file gets a dated backup (the metadata stays put).
+    writeFileSync(source, `${PRESET}\n# re-cut\n`)
+    const resynced = autoApplyCompaction(home)
+    assert.equal(resynced.applied, false)
+    assert.equal(resynced.preset, presetFile)
+    assert.match(readFileSync(presetFile, 'utf8'), /# re-cut/)
+    const backups = readdirSync(dirname(presetFile)).filter((name) => name.includes('.bak-'))
+    assert.equal(backups.length, 1)
+    assert.match(backups[0], /agent\.cordis\.yml\.bak-/)
+  } finally {
+    if (realSource === undefined) delete process.env.DSH_QWEN38_PRESET_SRC
+    else process.env.DSH_QWEN38_PRESET_SRC = realSource
+    rmSync(home, { recursive: true, force: true })
+  }
+})

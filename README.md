@@ -12,7 +12,7 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 ```
 
-Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset from the standard preset's composition, and sets it as the default agent preset when no default is configured. New sessions use it automatically; existing sessions keep the preset they were created with.
+Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset from the standard preset's composition, and sets it as the default agent preset when no default is configured. The generated preset tracks the standard composition — every start re-derives it, and only content that actually changed is rewritten (with a dated backup). New sessions use it automatically; existing sessions keep the preset they were created with.
 
 ![the generated qwen38 preset on the Agent presets page](<docs/qwen38 preset-en.png>)
 
@@ -55,7 +55,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 dsh plugin --profile web update dsh-qwen38-local-qol
 ```
 
-`github:` dependencies resolve to an exact commit — if the profile lockfile still pins the commit first installed, remove and re-add the plugin to force re-resolution. Updates never touch the generated preset or the settings section.
+`github:` dependencies resolve to an exact commit — if the profile lockfile still pins the commit first installed, remove and re-add the plugin to force re-resolution. Updates never touch the settings section; the generated preset re-syncs from the standard composition on the next start (only changed content is rewritten, with a dated backup).
 
 ## Uninstall
 
@@ -90,7 +90,7 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 ```
 
-重启 `dsh web`：启动时插件从 standard preset 的组成生成 **`qwen38`** 用户 preset，且未配置默认时将其设为默认 agent preset。新会话自动使用；已有会话保留创建时的 preset。
+重启 `dsh web`：启动时插件从 standard preset 的组成生成 **`qwen38`** 用户 preset，且未配置默认时将其设为默认 agent preset。生成的 preset 跟随 standard 组成——每次启动重新派生，只有真正变化的内容会被重写（带日期备份）。新会话自动使用；已有会话保留创建时的 preset。
 
 ![生成的 qwen38 预设（Agent 预设页）](<docs/qwen38 preset-cn.png>)
 
@@ -133,7 +133,7 @@ DSH 设置 → **Qwen3.8 本地**：
 dsh plugin --profile web update dsh-qwen38-local-qol
 ```
 
-`github:` 依赖按精确 commit 解析——若 profile 锁文件仍钉在首次安装时的 commit，remove 后重新 add 插件即可强制重新解析。更新不触碰生成的 preset 与设置节。
+`github:` 依赖按精确 commit 解析——若 profile 锁文件仍钉在首次安装时的 commit，remove 后重新 add 插件即可强制重新解析。更新不触碰设置节；生成的 preset 在下次启动时从 standard 组成重新同步（只重写真正变化的内容，带日期备份）。
 
 ## 卸载
 
