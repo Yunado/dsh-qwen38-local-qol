@@ -123,23 +123,35 @@ function messageContent(message, imageDataUrls = new Map()) {
 
 /**
  * Collect the `tool` wire messages carried by one user message's tool-result
- * blocks (a user message may carry several parallel results).
+ * blocks (a user message may carry several parallel results). The OpenAI
+ * `tool` role takes plain text content, so an image nested in a tool result
+ * (the `read_image` envelope's adjacent image block) is projected right after
+ * the `tool` message as a `user` message carrying `image_url` entries — the
+ * ordering constraint (tool result immediately after its `tool_calls`) is
+ * preserved and the model sees the pixels it was told about.
  * @param message - one harness user message.
- * @returns wire tool messages in block order.
+ * @param imageDataUrls - map from image block to its `data:` URL.
+ * @returns wire messages (tool results plus their image follow-ups) in block order.
  */
-function toolResultMessages(message) {
+function toolResultMessages(message, imageDataUrls = new Map()) {
   const out = []
   for (const block of message.content ?? []) {
     if (block.type !== 'tool-result') continue
     let text = ''
+    const images = []
     for (const inner of block.content ?? []) {
       if (inner.type === 'text') text += inner.text
+      else if (inner.type === 'image') images.push(inner)
     }
     out.push({
       role: 'tool',
       tool_call_id: block.toolCallId,
       content: block.isError ? `[error] ${text}` : text,
     })
+    const entries = images.map((inner) => imageEntry(inner, imageDataUrls.get(inner)))
+    if (entries.some((entry) => entry.type === 'image_url')) {
+      out.push({ role: 'user', content: entries })
+    }
   }
   return out
 }
@@ -182,13 +194,13 @@ export function toOpenAiMessages(options, imageDataUrls = new Map()) {
       continue
     }
     if (message.role === 'tool') {
-      const tools = toolResultMessages(message)
+      const tools = toolResultMessages(message, imageDataUrls)
       if (tools.length === 0) messages.push({ role: message.role, content: '' })
       else messages.push(...tools)
       continue
     }
     // user (and any unknown role falls through to the plain projection)
-    const tools = toolResultMessages(message)
+    const tools = toolResultMessages(message, imageDataUrls)
     const content = messageContent(message, imageDataUrls)
     if (content !== '' || tools.length === 0) messages.push({ role: message.role, content })
     messages.push(...tools)

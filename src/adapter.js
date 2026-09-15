@@ -292,10 +292,12 @@ export class QwenLocalAdapter extends LlmAdapter {
 }
 
 /**
- * Resolve the `data:` URL for every user image block in the request through
- * the attachment service (optional seam). A block whose bytes cannot be read
- * degrades to the text placeholder so one unreadable image never fails the
- * request.
+ * Resolve the `data:` URL for every image block in the request through the
+ * attachment service (optional seam). Image blocks may ride top-level (user
+ * attachments) or nested inside tool-result content (the `read_image`
+ * envelope carries its pixels as an adjacent image block); both shapes are
+ * resolved. A block whose bytes cannot be read degrades to the text
+ * placeholder so one unreadable image never fails the request.
  * @param attachment - the attachment service, or undefined.
  * @param options - the assembled request.
  * @returns a map from image block to its `data:` URL.
@@ -303,17 +305,24 @@ export class QwenLocalAdapter extends LlmAdapter {
 async function resolveImageDataUrls(attachment, options) {
   const urls = new Map()
   if (attachment === undefined || typeof attachment.readImage !== 'function') return urls
-  for (const message of options.messages ?? []) {
-    for (const block of message.content ?? []) {
-      if (block.type !== 'image') continue
-      try {
-        const stored = await attachment.readImage(block.attachment, options.signal)
-        urls.set(block, `data:${stored.ref.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`)
-      } catch {
-        // Unreadable image (store churn, digest mismatch): the placeholder
-        // keeps the request honest about what the model will not see.
-      }
+  const visit = (block) => {
+    if (block.type === 'image') {
+      visitImage(block)
+      return
     }
+    if (block.type === 'tool-result') for (const inner of block.content ?? []) visit(inner)
+  }
+  const visitImage = async (block) => {
+    try {
+      const stored = await attachment.readImage(block.attachment, options.signal)
+      urls.set(block, `data:${stored.ref.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`)
+    } catch {
+      // Unreadable image (store churn, digest mismatch): the placeholder
+      // keeps the request honest about what the model will not see.
+    }
+  }
+  for (const message of options.messages ?? []) {
+    for (const block of message.content ?? []) visit(block)
   }
   return urls
 }
