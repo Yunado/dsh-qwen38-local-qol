@@ -212,12 +212,14 @@ export function ensureDefaultPreset(dshHome) {
 
 /**
  * Render the preset.yml document published beside the generated composition.
- * @returns the YAML text (the name and description keys as locale maps).
+ * The name and description keys are written as unlocalized scalars (the
+ * English labels): stock DSH trees only parse the scalar form, while
+ * locale-map-capable trees accept the scalar beside the map — so the scalar
+ * is readable on every tree. The per-locale dictionaries stay the source.
+ * @returns the YAML text.
  */
 export function renderPresetMetadata() {
-  const names = Object.entries(PRESET_NAMES).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  const descriptions = Object.entries(PRESET_DESCRIPTIONS).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  return `name:\n${names}\ndescription:\n${descriptions}\n`
+  return `name: ${PRESET_NAMES.en}\ndescription: ${PRESET_DESCRIPTIONS.en}\n`
 }
 
 /**

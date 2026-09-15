@@ -167,10 +167,10 @@ test('applyDefaultPreset: leaves a nested agent-presets key alone', () => {
   assert.ok(text.includes('plugins:\n  agent-presets: true'))
 })
 
-test('renderPresetMetadata: publishes the name and description as locale maps', () => {
+test('renderPresetMetadata: publishes the name and description as unlocalized scalars (readable by stock and locale-map trees)', () => {
   assert.equal(PRESET_DESCRIPTIONS.zh, '标准模式 + 自定义压缩')
   assert.equal(PRESET_DESCRIPTIONS.en, 'Standard mode + custom compaction')
-  assert.equal(renderPresetMetadata(), 'name:\n  zh: Qwen38模式\n  en: Qwen38 mode\ndescription:\n  zh: 标准模式 + 自定义压缩\n  en: Standard mode + custom compaction\n')
+  assert.equal(renderPresetMetadata(), 'name: Qwen38 mode\ndescription: Standard mode + custom compaction\n')
 })
 
 test('readDefaultAgentPreset: lenient read of the default preset key', () => {
