@@ -17,6 +17,7 @@ import {
   renderPresetMetadata,
   readDefaultAgentPreset,
   readCompactionStatus,
+  readLocalePreference,
   writeGeneratedPreset,
   standardPresetPathFrom,
   PRESET_ID,
@@ -167,10 +168,18 @@ test('applyDefaultPreset: leaves a nested agent-presets key alone', () => {
   assert.ok(text.includes('plugins:\n  agent-presets: true'))
 })
 
-test('renderPresetMetadata: publishes the name and description as locale maps (resolved per the reader locale by locale-map-capable trees)', () => {
+test('renderPresetMetadata: unlocalized scalars in the requested locale (stock trees parse only the scalar form)', () => {
   assert.equal(PRESET_DESCRIPTIONS.zh, '标准模式 + 自定义压缩')
   assert.equal(PRESET_DESCRIPTIONS.en, 'Standard mode + custom compaction')
-  assert.equal(renderPresetMetadata(), 'name:\n  zh: Qwen38模式\n  en: Qwen38 mode\ndescription:\n  zh: 标准模式 + 自定义压缩\n  en: Standard mode + custom compaction\n')
+  assert.equal(renderPresetMetadata('zh'), 'name: Qwen38模式\ndescription: 标准模式 + 自定义压缩\n')
+  assert.equal(renderPresetMetadata('en'), 'name: Qwen38 mode\ndescription: Standard mode + custom compaction\n')
+  assert.equal(renderPresetMetadata(undefined), 'name: Qwen38 mode\ndescription: Standard mode + custom compaction\n')
+})
+
+test('readLocalePreference: lenient read of the locale preference key', () => {
+  assert.equal(readLocalePreference('locale:\n  preference: zh\n  other: x\n'), 'zh')
+  assert.equal(readLocalePreference('locale:\n  other: x\n'), undefined)
+  assert.equal(readLocalePreference('agent-presets:\n  default: standard\n'), undefined)
 })
 
 test('readDefaultAgentPreset: lenient read of the default preset key', () => {
