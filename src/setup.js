@@ -45,7 +45,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { createRequire } from 'node:module'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 /** The user preset directory, relative to the DSH home (`.agent-presets`). */
 export const USER_PRESET_DIR = '.agent-presets'
@@ -331,30 +331,49 @@ export function writeGeneratedPreset(dshHome, sourceText, { overwrite = true } =
 
 /**
  * Locate the standard preset's composition shipped inside the installed
- * `@deepseek-ai/dsh-agent-presets` package — the same file the agent-presets
- * service reads (its shipped root). Resolved without loading the module:
- * `require.resolve` only walks the `node_modules` chain, so the plugin's
- * boot stays light.
- * @returns the composition file path, or undefined when the package is not
- *   installed (a profile without the preset feature).
+ * `@deepseek-ai/dsh-agent-presets` package, walking the `node_modules` chain
+ * from a given module anchor. Resolved without loading the module
+ * (`require.resolve` only walks chains), so the plugin's boot stays light.
+ * @param anchor - the module path whose node_modules chain is walked.
+ * @returns the composition file path (the same file the agent-presets service
+ *   reads — the package's shipped standard preset), or undefined when the
+ *   package is not installed on that chain.
  */
-export function shippedStandardPresetPath() {
+export function standardPresetPathFrom(anchor) {
   try {
-    const packageJson = createRequire(import.meta.url).resolve('@deepseek-ai/dsh-agent-presets/package.json')
+    const packageJson = createRequire(anchor).resolve('@deepseek-ai/dsh-agent-presets/package.json')
     return join(dirname(packageJson), 'presets', 'standard', 'agent.cordis.yml')
   } catch {
-    // The package is not in this node_modules chain (or its manifest hides
-    // the package.json subpath): the shipped source is unavailable.
     return undefined
   }
+}
+
+/** The in-profile chain (from the plugin's own file): works when the profile's node_modules links the DSH packages. */
+export function shippedStandardPresetPath() {
+  return standardPresetPathFrom(import.meta.url)
+}
+
+/**
+ * The host's own chain: the plugin runs inside the DSH host process, so the
+ * host's entry module (`process.argv[1]`) resolves the packages the host
+ * ships — always the composition the running host itself uses (no version
+ * drift, no env, no profile linkage required). Outside a host process (the
+ * plain CLI, tests) the entry is the CLI itself, where the chain may or may
+ * not carry the package.
+ * @returns the composition file path, or undefined when unavailable.
+ */
+export function hostStandardPresetPath() {
+  const entry = process.argv[1] !== undefined ? resolve(process.cwd(), process.argv[1]) : undefined
+  if (entry === undefined || !existsSync(entry)) return undefined
+  return standardPresetPathFrom(entry)
 }
 
 /**
  * Resolve the standard preset's composition file for the CLI writer and the
  * boot auto-apply. Order: the `DSH_QWEN38_PRESET_SRC` override (an explicit
- * choice), the standard preset shipped inside the installed
- * `@deepseek-ai/dsh-agent-presets` package (the same source the agent-presets
- * service reads), then a user overlay beside the generated preset.
+ * choice), the in-profile chain, the host's own chain (the running host's
+ * entry module — present whenever the plugin boots inside a real DSH host),
+ * then a user overlay beside the generated preset.
  * @param dshHome - the DSH home directory (the overlay base).
  * @returns the composition file path.
  * @throws {Error} when no source is readable.
@@ -363,6 +382,7 @@ export function resolveStandardSource(dshHome) {
   const candidates = [
     process.env.DSH_QWEN38_PRESET_SRC,
     shippedStandardPresetPath(),
+    hostStandardPresetPath(),
     join(dshHome, USER_PRESET_DIR, 'standard', 'agent.cordis.yml'),
   ]
   const source = candidates.find((candidate) => candidate !== undefined && existsSync(candidate))

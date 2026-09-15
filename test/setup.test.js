@@ -18,6 +18,7 @@ import {
   readDefaultAgentPreset,
   readCompactionStatus,
   writeGeneratedPreset,
+  standardPresetPathFrom,
   PRESET_ID,
   PRESET_DESCRIPTIONS,
 } from '../src/setup.js'
@@ -248,6 +249,22 @@ test('autoApplyCompaction: first run generates and sets the default; re-runs and
     if (realSource === undefined) delete process.env.DSH_QWEN38_PRESET_SRC
     else process.env.DSH_QWEN38_PRESET_SRC = realSource
     rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('standardPresetPathFrom: resolves via a node_modules chain, undefined when absent', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qol-preset-anchor-'))
+  try {
+    const anchor = join(dir, 'probe.js')
+    assert.equal(standardPresetPathFrom(anchor), undefined)
+    const pkgDir = join(dir, 'node_modules', '@deepseek-ai', 'dsh-agent-presets')
+    mkdirSync(join(pkgDir, 'presets', 'standard'), { recursive: true })
+    writeFileSync(join(pkgDir, 'package.json'), '{"name":"@deepseek-ai/dsh-agent-presets"}\n')
+    const composition = join(pkgDir, 'presets', 'standard', 'agent.cordis.yml')
+    writeFileSync(composition, '- id: agent\n')
+    assert.equal(standardPresetPathFrom(anchor), composition)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })
 
