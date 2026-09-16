@@ -143,12 +143,18 @@ function toolResultMessages(message, imageDataUrls = new Map()) {
       if (inner.type === 'text') text += inner.text
       else if (inner.type === 'image') images.push(inner)
     }
+    const entries = images.map((inner) => imageEntry(inner, imageDataUrls.get(inner)))
+    // Demoted or unreadable images ride as placeholder text inside the tool
+    // content, keeping the request honest about what the model will not see.
+    const parts = [text, ...entries.filter((entry) => entry.type === 'text').map((entry) => entry.text)]
+      .filter((part) => part !== '')
     out.push({
       role: 'tool',
       tool_call_id: block.toolCallId,
-      content: block.isError ? `[error] ${text}` : text,
+      content: parts.length === 0
+        ? (block.isError ? '[error]' : '')
+        : (block.isError ? `[error] ${parts.join(' ')}` : parts.join(' ')),
     })
-    const entries = images.map((inner) => imageEntry(inner, imageDataUrls.get(inner)))
     if (entries.some((entry) => entry.type === 'image_url')) {
       out.push({ role: 'user', content: entries })
     }
@@ -206,6 +212,54 @@ export function toOpenAiMessages(options, imageDataUrls = new Map()) {
     messages.push(...tools)
   }
   return messages
+}
+
+/**
+ * Tool-name markers identifying a Cua Driver computer-use tool (the native
+ * and MCP variants): their results are desktop snapshots whose screen state
+ * goes stale with every subsequent action.
+ */
+export const CUA_TOOL_MARKERS = ['cua_driver', 'cua-driver']
+
+/**
+ * Demote stale computer-use screenshots to text placeholders, keeping only
+ * the latest desktop snapshot. The NInfer line's Vision budget is
+ * per-request (131,072 raw patches across all media in the request), so an
+ * accumulating computer-use session exceeds it after roughly sixteen
+ * full-resolution screenshots; each step invalidates the earlier screens, so
+ * old snapshots are budget, not information. User attachments and images
+ * from non-Cua tools ride untouched; a demoted block falls through the
+ * existing placeholder path (no data URL entry → the text entry).
+ * @param options - the assembled request.
+ * @param imageDataUrls - the resolved map from image block to `data:` URL.
+ * @returns a new map with every stale Cua screenshot removed (the latest kept).
+ */
+export function filterStaleCuaScreenshots(options, imageDataUrls) {
+  const messages = options.messages ?? []
+  const toolNames = new Map()
+  for (const message of messages) {
+    for (const block of message.content ?? []) {
+      if (block.type === 'tool-call') toolNames.set(block.id, block.name)
+    }
+  }
+  const isCua = (name) => name !== undefined && CUA_TOOL_MARKERS.some((marker) => name.toLowerCase().includes(marker))
+  let latest = undefined
+  const stale = []
+  for (const message of messages) {
+    for (const block of message.content ?? []) {
+      if (block.type !== 'tool-result') continue
+      if (!isCua(toolNames.get(block.toolCallId))) continue
+      for (const inner of block.content ?? []) {
+        if (inner.type === 'image' && imageDataUrls.has(inner)) {
+          if (latest !== undefined) stale.push(latest)
+          latest = inner
+        }
+      }
+    }
+  }
+  const out = new Map(imageDataUrls)
+  for (const block of stale) out.delete(block)
+  return out
 }
 
 /**

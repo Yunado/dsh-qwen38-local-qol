@@ -6,6 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildQwenBody,
+  filterStaleCuaScreenshots,
   toOpenAiMessages,
   toOpenAiTools,
   toFinishReason,
@@ -189,6 +190,74 @@ test('toOpenAiMessages: assistant with only tool calls gets null content', () =>
     ],
   }
   assert.equal(toOpenAiMessages(options)[0].content, null)
+})
+
+const CUA_IMAGE = (name) => ({ type: 'image', attachment: { name, mediaType: 'image/png', width: 3840, height: 2160 } })
+
+function cuaConversation(toolName) {
+  const shots = [CUA_IMAGE('screen-1.png'), CUA_IMAGE('screen-2.png'), CUA_IMAGE('screen-3.png')]
+  const messages = [{ role: 'user', content: [{ type: 'text', text: 'click the button' }] }]
+  for (const [i, image] of shots.entries()) {
+    const id = `cua-${i}`
+    messages.push({ role: 'assistant', content: [{ type: 'tool-call', id, name: toolName, arguments: '{}' }] })
+    messages.push({ role: 'tool', content: [{ type: 'tool-result', toolCallId: id, content: [image], isError: false }] })
+  }
+  return { messages, shots }
+}
+
+test('filterStaleCuaScreenshots: keeps the latest desktop snapshot, demotes the earlier ones', () => {
+  const { messages, shots } = cuaConversation('cua_driver_native__screenshot')
+  const userImage = CUA_IMAGE('photo.jpg')
+  const all = [
+    ...shots,
+    userImage,
+  ]
+  const urls = new Map(all.map((block, i) => [block, `data:${i}`]))
+  const options = { messages: [...messages, { role: 'user', content: [userImage] }] }
+  const filtered = filterStaleCuaScreenshots(options, urls)
+  assert.equal(filtered.size, 2)
+  assert.ok(filtered.has(shots[2]), 'the latest screenshot keeps its data URL')
+  assert.ok(filtered.has(userImage), 'user attachments ride untouched')
+  assert.ok(!filtered.has(shots[0]) && !filtered.has(shots[1]), 'stale screenshots demote to placeholders')
+  assert.equal(urls.size, 4, 'the input map is not mutated')
+})
+
+test('filterStaleCuaScreenshots: no-op without computer-use tools (non-cua images ride)', () => {
+  const image = CUA_IMAGE('read.png')
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: 'read this' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', id: 'r1', name: 'read_image', arguments: '{}' }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'r1', content: [image], isError: false }] },
+  ]
+  const urls = new Map([[image, 'data:0']])
+  assert.deepEqual([...filterStaleCuaScreenshots({ messages }, urls).entries()], [[image, 'data:0']])
+})
+
+test('filterStaleCuaScreenshots: the MCP variant prefix demotes too', () => {
+  const { messages, shots } = cuaConversation('cua-driver-mcp__screenshot')
+  const urls = new Map(shots.map((block, i) => [block, `data:${i}`]))
+  const filtered = filterStaleCuaScreenshots({ messages }, urls)
+  assert.equal(filtered.size, 1)
+  assert.ok(filtered.has(shots[2]))
+})
+
+test('toOpenAiMessages: demoted cua screenshots ride as text placeholders, the latest as image_url', () => {
+  const { messages, shots } = cuaConversation('cua_driver_native__screenshot')
+  const urls = filterStaleCuaScreenshots(
+    { messages },
+    new Map(shots.map((block, i) => [block, `data:image/png;base64,${i}`])),
+  )
+  const wire = toOpenAiMessages({ messages }, urls)
+  const toolMessages = wire.filter((m) => m.role === 'tool')
+  assert.match(toolMessages[0].content, /\[image: screen-1\.png 3840x2160\]/)
+  assert.match(toolMessages[1].content, /\[image: screen-2\.png 3840x2160\]/)
+  // The latest snapshot rides the read_image envelope: empty tool content +
+  // the user follow-up carrying the image_url entry.
+  assert.equal(toolMessages[2].content, '')
+  assert.deepEqual(wire.at(-1), {
+    role: 'user',
+    content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,2' } }],
+  })
 })
 
 test('toOpenAiTools: standard function array, undefined when empty', () => {

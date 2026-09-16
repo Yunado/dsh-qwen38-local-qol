@@ -14,6 +14,7 @@ import {
   createChunkTranslator,
   createSseParser,
   buildQwenBody,
+  filterStaleCuaScreenshots,
   ninferVisionTokens,
   parseFrame,
   requestHeaders,
@@ -199,7 +200,14 @@ export class QwenLocalAdapter extends LlmAdapter {
    */
   async *stream(options) {
     assertRepresentable(options)
-    const imageDataUrls = await resolveImageDataUrls(this.#attachment, options)
+    // Stale computer-use screenshots demote to text placeholders: the
+    // server's per-request Vision budget must not accumulate across a long
+    // desktop session (the latest snapshot stays at full resolution, so
+    // coordinate mapping is untouched).
+    const imageDataUrls = filterStaleCuaScreenshots(
+      options,
+      await resolveImageDataUrls(this.#attachment, options),
+    )
     const url = this.url
     const response = await this.#post(url, options, imageDataUrls)
 

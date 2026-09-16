@@ -21,6 +21,7 @@ Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset fro
 - **Per-request thinking budgets.** The llama.cpp line sends the selected per-effort budget on every request (`reasoning_effort` + `reasoning_budget_tokens` — overrides the server's `--reasoning-budget`); the NInfer engine reads its single thinking budget from the server startup flag (`--default-thinking-budget`) — the settings tab shows that as a note on the NInfer line (no input), while `defaultThinkingBudget` stays valid as a headless/env config field; the TabbyAPI line accepts both natively, so per-effort budgets ride every request.
 - **A compaction backend.** The summarizer's prefill is trimmed (recent reasoning only, images downgraded to text placeholders, tool results capped), and compaction calls run thinking-off at the line's full output cap — checkpoints stop getting truncated at the token cap.
 - **A settings tab** that configures both lines, live.
+- **Bounded computer-use Vision cost.** Stale desktop snapshots from the Cua Driver (computer use) ride the wire as text placeholders; only the latest screen goes out at full resolution. The NInfer line's Vision budget is per-request (131,072 raw patches across all media), so an accumulating desktop session would exceed it after ~16 full-resolution screenshots — demotion keeps long sessions under the budget without touching the latest screen, so click-coordinate mapping stays exact.
 
 ## The settings tab
 
@@ -99,6 +100,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 - **逐请求 thinking 预算。** llama.cpp 线每请求发送所选 effort 的预算（`reasoning_effort` + `reasoning_budget_tokens`——覆盖服务端 `--reasoning-budget`）；NInfer 引擎的 thinking 预算由服务端启动参数（`--default-thinking-budget`）决定——设置 tab 在 NInfer 线只显示说明（无输入），`defaultThinkingBudget` 字段保留为 headless/env 配置项；TabbyAPI 线两者都原生接受，逐请求按档发送。
 - **压缩（compaction）后端。** 摘要 prefill 先裁剪（只留近 N 轮 reasoning、图片降为文本占位符、工具结果按字数帽截断），且压缩调用强制 thinking off + 该线完整输出帽——checkpoint 不再被 token 帽截断。
 - **设置 tab**：图形化配置各线，即时生效。
+- **有界的 computer-use 视觉成本。** Cua Driver（computer use）的过期桌面快照以文本占位符上 wire，只有最新一屏按全分辨率发出。NInfer 线的视觉预算是每请求的（全部媒体合计 131,072 raw patches），累积的桌面会话在约 16 张全分辨率截图后就会超预算——降级让长会话保持预算内，且不动最新一屏，点击坐标映射依旧精确。
 
 ## 设置 tab
 
