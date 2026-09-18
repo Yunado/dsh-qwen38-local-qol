@@ -211,12 +211,44 @@ export function ensureDefaultPreset(dshHome) {
 
 /**
  * Render the preset.yml document published beside the generated composition.
- * @returns the YAML text (the name and description keys as locale maps).
+ * The name and description keys are unlocalized scalars (stock DSH trees
+ * parse only the scalar form), in the reader's locale: the label follows the
+ * DSH home's `locale.preference` setting at generation time, and a changed
+ * preference rewrites the metadata on the next start. The per-locale
+ * dictionaries stay the source.
+ * @param locale - the locale id to render ('zh' picks the zh labels; any
+ *   other value, including undefined, renders en).
+ * @returns the YAML text.
  */
-export function renderPresetMetadata() {
-  const names = Object.entries(PRESET_NAMES).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  const descriptions = Object.entries(PRESET_DESCRIPTIONS).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  return `name:\n${names}\ndescription:\n${descriptions}\n`
+export function renderPresetMetadata(locale) {
+  const pick = (entries) => (locale === 'zh' ? entries.zh : entries.en)
+  return `name: ${pick(PRESET_NAMES)}\ndescription: ${pick(PRESET_DESCRIPTIONS)}\n`
+}
+
+/**
+ * Read the locale preference from a `settings.yaml` text. Lenient read
+ * (same discipline as the default preset reader): the first top-level
+ * `locale:` plain block's first `preference:` key; an inline entry, a
+ * duplicated section, or a section without the key all answer undefined.
+ * @param text - the settings.yaml content; '' for a missing or empty file.
+ * @returns the locale id ('zh', 'en', ...), or undefined.
+ */
+export function readLocalePreference(text) {
+  const lines = text.split('\n')
+  let sectionIndex = -1
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^locale:\s*$/.test(lines[i])) { sectionIndex = i; break }
+  }
+  if (sectionIndex === -1) return undefined
+  let sectionEnd = lines.length
+  for (let i = sectionIndex + 1; i < lines.length; i += 1) {
+    if (/^[^\s#]/.test(lines[i])) { sectionEnd = i; break }
+  }
+  for (let i = sectionIndex + 1; i < sectionEnd; i += 1) {
+    const match = lines[i].match(/^\s+preference:\s*(\S+)/)
+    if (match !== null) return match[1]
+  }
+  return undefined
 }
 
 /**
@@ -296,9 +328,11 @@ export function writeGeneratedPreset(dshHome, sourceText, { overwrite = true } =
   if (!overwrite && (existsSync(target) || existsSync(metadataTarget))) {
     throw new Error(`dsh-qwen38-local-qol: setup: the preset already exists at ${target}; remove it to regenerate`)
   }
+  const settingsPath = join(dshHome, SETTINGS_FILE)
+  const locale = existsSync(settingsPath) ? readLocalePreference(readFileSync(settingsPath, 'utf8')) : undefined
   mkdirSync(dir, { recursive: true })
   writeIfChanged(target, transformed)
-  writeIfChanged(metadataTarget, renderPresetMetadata())
+  writeIfChanged(metadataTarget, renderPresetMetadata(locale))
   return { preset: target, metadata: metadataTarget }
 }
 
