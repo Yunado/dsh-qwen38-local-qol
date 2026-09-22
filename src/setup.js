@@ -382,16 +382,36 @@ export function resolveStandardSource(dshHome) {
 }
 
 /**
+ * Re-render the generated preset's display metadata against the DSH home's
+ * current `locale.preference`, touching the file only when the rendered
+ * language actually changes (writeIfChanged); the composition is left
+ * untouched. Lets a changed locale reach the card label on the next start
+ * without regenerating the preset.
+ * @param dshHome - the DSH home directory.
+ * @returns the metadata path, or undefined when the preset itself is missing.
+ */
+export function refreshPresetMetadata(dshHome) {
+  const dir = join(dshHome, USER_PRESET_DIR, PRESET_ID)
+  if (!existsSync(join(dir, 'agent.cordis.yml'))) return undefined
+  const settingsPath = join(dshHome, SETTINGS_FILE)
+  const locale = existsSync(settingsPath) ? readLocalePreference(readFileSync(settingsPath, 'utf8')) : undefined
+  writeIfChanged(join(dir, PRESET_METADATA_FILE), renderPresetMetadata(locale))
+  return join(dir, PRESET_METADATA_FILE)
+}
+
+/**
  * Self-apply the compaction wiring (the setup CLI's one-shot, made
  * automatic): generate the user preset from the standard preset's
- * composition when it is missing, and set the default agent preset only when
- * no default is configured yet — an explicit user choice (any value) is
- * respected on every later boot. Idempotent: an existing preset and an
- * existing default are left untouched.
+ * composition when it is missing, re-render the display metadata of an
+ * existing preset against the current locale preference, and set the default
+ * agent preset only when no default is configured yet — an explicit user
+ * choice (any value) is respected on every later boot. Idempotent: an
+ * existing preset and an existing default are left untouched (the metadata
+ * scalars excepted — a changed locale rewrites only those).
  * @param dshHome - the DSH home directory.
  * @returns what changed: `applied` (the preset was generated this call), the
- *   `preset`/`metadata` paths (undefined when the preset already existed),
- *   and `defaultChanged` ('created', 'appended', or 'none').
+ *   `preset`/`metadata` paths (undefined when the preset already existed /
+ *   is missing), and `defaultChanged` ('created', 'appended', or 'none').
  * @throws {Error} when no standard source is readable or a write fails (the
  *   caller logs it; the dot stays grey until the next start fixes it).
  */
@@ -405,6 +425,8 @@ export function autoApplyCompaction(dshHome) {
     preset = written.preset
     metadata = written.metadata
     applied = true
+  } else {
+    metadata = refreshPresetMetadata(dshHome)
   }
   // The lenient read answers undefined for a missing or key-less block; an
   // explicit default (any value) is respected and never replaced at boot.

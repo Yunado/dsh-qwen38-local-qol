@@ -259,3 +259,37 @@ test('autoApplyCompaction: first run generates and sets the default; re-runs and
     rmSync(home, { recursive: true, force: true })
   }
 })
+
+test('autoApplyCompaction: an existing preset keeps its composition but re-renders the metadata to the current locale', () => {
+  const home = mkdtempSync(join(tmpdir(), 'qol-auto-apply-locale-'))
+  const source = join(home, 'standard.cordis.yml')
+  writeFileSync(source, PRESET)
+  const realSource = process.env.DSH_QWEN38_PRESET_SRC
+  process.env.DSH_QWEN38_PRESET_SRC = source
+  try {
+    writeFileSync(join(home, 'settings.yaml'), 'locale:\n  preference: en\n')
+    const first = autoApplyCompaction(home)
+    assert.equal(first.applied, true)
+    const presetDir = join(home, '.agent-presets', 'qwen38')
+    const metadataPath = join(presetDir, 'preset.yml')
+    assert.match(readFileSync(metadataPath, 'utf8'), /Qwen38 mode/)
+
+    // The user switches the locale: the next boot re-renders the label while
+    // the composition stays byte-for-byte untouched.
+    const composition = readFileSync(join(presetDir, 'agent.cordis.yml'), 'utf8')
+    writeFileSync(join(home, 'settings.yaml'), 'locale:\n  preference: zh\n')
+    const second = autoApplyCompaction(home)
+    assert.equal(second.applied, false)
+    assert.match(readFileSync(metadataPath, 'utf8'), /Qwen38模式/)
+    assert.equal(readFileSync(join(presetDir, 'agent.cordis.yml'), 'utf8'), composition)
+
+    // Same locale again: idempotent — no rewrite, no new backup.
+    const before = readdirSync(presetDir).sort()
+    autoApplyCompaction(home)
+    assert.deepEqual(readdirSync(presetDir).sort(), before)
+  } finally {
+    if (realSource === undefined) delete process.env.DSH_QWEN38_PRESET_SRC
+    else process.env.DSH_QWEN38_PRESET_SRC = realSource
+    rmSync(home, { recursive: true, force: true })
+  }
+})
