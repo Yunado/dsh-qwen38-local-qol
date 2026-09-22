@@ -142,6 +142,31 @@ test('stream: HTTP error surfaces with the stable code and status', async () => 
   )
 })
 
+test('stream: a vision media-budget 400 classifies as CONTEXT_WINDOW_EXCEEDED', async () => {
+  const response = {
+    ok: false,
+    status: 400,
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify({
+      error: {
+        code: 'media_budget_exceeded',
+        message: 'vision raw patches exceed processor budget',
+        param: 'messages',
+        type: 'invalid_request_error',
+      },
+    }),
+    body: null,
+  }
+  const { fetch } = fakeFetch(response)
+  const adapter = new QwenLocalAdapter({ ...CONFIG, fetch })
+  await assert.rejects(
+    (async () => { for await (const _ of adapter.stream(options())) { /* drain */ } })(),
+    (error) => error.code === 'CONTEXT_WINDOW_EXCEEDED'
+      && /HTTP 400/.test(error.message)
+      && /media_budget_exceeded/.test(error.message),
+  )
+})
+
 test('stream: transport failure surfaces as PROVIDER_UNREACHABLE; caller abort rethrows the cause', async () => {
   const boom = new Error('ECONNREFUSED')
   const failing = async () => { throw boom }

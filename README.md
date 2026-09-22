@@ -48,6 +48,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 - **Flash-Next has a fast line and a compat line** — the ExLlamaV3/TabbyAPI dialect (EXL3 quant, 256K context) is the fast path; the llama.cpp dialect still runs it at its own window/budget values.
 - **The TabbyAPI line's vision token count is not pinned** — the token meter reports image capacity as unknown on that line until the ExLlamaV3 image-processor formula is measured (the request itself works; only the pre-flight capacity projection is affected).
 - **Multimodal tool messages are a newer wire form** — tool messages carrying resolved images are sent as a content array with `image_url` entries; each line's server must accept that form. A rejecting line answers with an HTTP error whose body the adapter surfaces verbatim (never a silent drop).
+- **Vision budget rejections self-heal** — an NInfer 400 `media_budget_exceeded` ("vision raw patches exceed processor budget") classifies as `CONTEXT_WINDOW_EXCEEDED`, so the harness's overflow recovery compacts history below the normal threshold and retries the step; only repeated budget failures (e.g. one image alone over the per-image cap) surface as an error.
 - **The preset seam is a web-surface feature** — headless profiles do not mount `agent-presets` rows; the provider route (thinking budgets) works on both surfaces.
 - **Summarizer internals depend on the engine version** — the wire rules (thinking off, full output cap) hold for every engine version; engine internals are outside the plugin's control.
 

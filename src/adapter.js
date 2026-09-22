@@ -7,7 +7,13 @@
  *
  * @module dsh-qwen38-local-qol/adapter
  */
-import { LlmAdapter, LlmError, attributionHeaders, errorChain } from '@deepseek-ai/dsh-llm'
+import {
+  CONTEXT_WINDOW_EXCEEDED_CODE,
+  LlmAdapter,
+  LlmError,
+  attributionHeaders,
+  errorChain,
+} from '@deepseek-ai/dsh-llm'
 import {
   chatCompletionsUrl,
   chunksFromCompletion,
@@ -219,9 +225,16 @@ export class QwenLocalAdapter extends LlmAdapter {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => '')
+      // A vision raw-patch budget rejection is a provider-confirmed context
+      // overflow: only the canonical CONTEXT_WINDOW_EXCEEDED code lets the
+      // harness's overflow recovery compact below the normal threshold and
+      // retry this step instead of surfacing the failure.
+      const code = response.status === 400 && /media_budget_exceeded/.test(detail)
+        ? CONTEXT_WINDOW_EXCEEDED_CODE
+        : PROVIDER_HTTP_ERROR_CODE
       throw new LlmError(
         `dsh-qwen38-local-qol: server at ${url} returned HTTP ${response.status}${detail ? `: ${detail.slice(0, MAX_ERROR_BODY_CHARS)}` : ''}`,
-        PROVIDER_HTTP_ERROR_CODE,
+        code,
         { status: response.status },
       )
     }
