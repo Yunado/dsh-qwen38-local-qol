@@ -165,6 +165,8 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   // Legacy shape (no user.lines): the active line migrates from the top level.
   assert.equal(draft.baseURL, 'http://localhost:8082/v1')
   assert.equal(draft.model, 'qwen3.8-27b-nvfp4')
+  // The top-level credential defaults to empty (keyless = no Authorization header).
+  assert.equal(draft.apiKey, '')
   // The other lines park at their built-in defaults.
   assert.equal(draft.lines.llamacpp.baseURL, '')
   assert.equal(draft.lines.llamacpp.contextWindow, '229376')
@@ -217,6 +219,13 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.lines.tabbyapi.baseURL, '')
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
   assert.equal(draft.lines.tabbyapi.maxTokens, '57344')
+})
+
+test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {
+  const keyed = client.toDraft({ dialect: 'ninfer', apiKey: 'sk-stored' })
+  assert.equal(keyed.apiKey, 'sk-stored')
+  const keyless = client.toDraft({ dialect: 'ninfer' })
+  assert.equal(keyless.apiKey, '')
 })
 
 test('toDraft: a tabbyapi-active section lifts the ExLlamaV3 line onto the inputs', () => {

@@ -44,6 +44,10 @@ const COPY = {
     baseURL: 'Server base URL',
     model: 'Model id',
     displayName: 'Display name',
+    apiKey: 'API key',
+    apiKeyHint: 'Optional — empty keeps every line keyless. When set, each request carries Authorization: Bearer <key>. Shared by all lines.',
+    revealKey: 'Reveal the stored key',
+    concealKey: 'Conceal the stored key',
     window: 'Window and output',
     contextWindow: 'Context window (tokens)',
     maxTokens: 'Output cap (tokens)',
@@ -80,6 +84,10 @@ const COPY = {
     baseURL: '服务器地址',
     model: '模型 id',
     displayName: '显示名',
+    apiKey: '接口密钥（API key）',
+    apiKeyHint: '可选——留空 = 各线无认证；填写后每个请求附带 Authorization: Bearer <key>。对所有线生效。',
+    revealKey: '显示已存的密钥',
+    concealKey: '隐藏已存的密钥',
     window: '窗口与输出',
     contextWindow: '上下文窗口（token）',
     maxTokens: '输出上限（token）',
@@ -245,6 +253,9 @@ export function toDraft(value) {
     images: active.images,
     keepTurns: active.keepTurns,
     toolChars: active.toolChars,
+    // Top-level credential shared by every line (empty = keyless, the wire
+    // omits the Authorization header).
+    apiKey: String(value.apiKey ?? ''),
   }
 }
 
@@ -271,6 +282,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const locale = useLocale((snapshot) => (snapshot.active === 'zh' ? 'zh' : 'en'))
   const t = COPY[locale]
   const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false, agentPresets: null })
+  // Password-style display for the API key: masked by default, the eye button
+  // toggles between revealing and concealing the stored value.
+  const [revealedKey, setRevealedKey] = React.useState(false)
 
   const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
 
@@ -360,6 +374,8 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       baseURL: draft.baseURL,
       model: draft.model,
       displayName: draft.displayName,
+      // The credential rides the section top level, not a line record.
+      apiKey: draft.apiKey,
       lines: {
         ninfer: lineBlock(persistedLines.ninfer),
         llamacpp: lineBlock(persistedLines.llamacpp),
@@ -437,6 +453,21 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         React.createElement(Input, { className: 'qol-input', value: draft.model, onChange: (e) => { setDraft({ model: e.target.value }) } })),
       React.createElement(Field, { label: t.displayName },
         React.createElement(Input, { className: 'qol-input', value: draft.displayName, onChange: (e) => { setDraft({ displayName: e.target.value }) } })),
+      React.createElement(Field, { label: t.apiKey },
+        React.createElement('div', { className: 'qol-row2' },
+          React.createElement(Input, {
+            className: 'qol-input',
+            type: revealedKey ? 'text' : 'password',
+            value: draft.apiKey,
+            onChange: (e) => { setDraft({ apiKey: e.target.value }) },
+          }),
+          React.createElement('button', {
+            type: 'button',
+            title: revealedKey ? t.concealKey : t.revealKey,
+            onClick: () => { setRevealedKey((v) => !v) },
+            style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '4px 2px' },
+          }, '\u{1F441}'))),
+      React.createElement('p', { className: 'qol-hint' }, t.apiKeyHint),
     ),
     React.createElement('section', { className: 'qol-group' },
       React.createElement('h3', { className: 'qol-groupHead' }, t.window),
