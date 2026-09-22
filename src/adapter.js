@@ -306,26 +306,33 @@ export class QwenLocalAdapter extends LlmAdapter {
 }
 
 /**
- * Resolve the `data:` URL for every user image block in the request through
- * the attachment service (optional seam). A block whose bytes cannot be read
+ * Resolve the `data:` URL for every image block in the request — top-level
+ * image blocks and the images nested in tool-result blocks — through the
+ * attachment service (optional seam). A block whose bytes cannot be read
  * degrades to the text placeholder so one unreadable image never fails the
  * request.
  * @param attachment - the attachment service, or undefined.
  * @param options - the assembled request.
- * @returns a map from image block to its `data:` URL.
+ * @returns a map from image block identity to its `data:` URL.
  */
 async function resolveImageDataUrls(attachment, options) {
   const urls = new Map()
   if (attachment === undefined || typeof attachment.readImage !== 'function') return urls
   for (const message of options.messages ?? []) {
     for (const block of message.content ?? []) {
-      if (block.type !== 'image') continue
-      try {
-        const stored = await attachment.readImage(block.attachment, options.signal)
-        urls.set(block, `data:${stored.ref.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`)
-      } catch {
-        // Unreadable image (store churn, digest mismatch): the placeholder
-        // keeps the request honest about what the model will not see.
+      const images = block.type === 'image'
+        ? [block]
+        : block.type === 'tool-result'
+          ? (block.content ?? []).filter((inner) => inner.type === 'image')
+          : []
+      for (const image of images) {
+        try {
+          const stored = await attachment.readImage(image.attachment, options.signal)
+          urls.set(image, `data:${stored.ref.mediaType};base64,${Buffer.from(stored.data).toString('base64')}`)
+        } catch {
+          // Unreadable image (store churn, digest mismatch): the placeholder
+          // keeps the request honest about what the model will not see.
+        }
       }
     }
   }

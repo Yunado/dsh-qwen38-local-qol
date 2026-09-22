@@ -249,6 +249,31 @@ test('stream: user image blocks resolve to image_url data URLs through the attac
   assert.ok(userMessage.content.some((entry) => entry.type === 'text' && entry.text === 'look'))
 })
 
+test('stream: a nested tool-result image resolves to a multimodal tool content array', async () => {
+  const pngBytes = new Uint8Array([137, 80, 78, 73, 13, 10, 26, 10])
+  const ref = { attachmentId: 'att-t1', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'shot.png' }
+  const attachment = { readImage: async () => ({ ref, data: pngBytes }) }
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+    'data: [DONE]\n\n',
+  ]
+  const { fetch, requests } = fakeFetch(sseResponse(frames))
+  const adapter = new QwenLocalAdapter({ ...CONFIG, attachment, fetch })
+  const imageOptions = {
+    ...options(),
+    messages: [{ role: 'user', content: [{ type: 'tool-result', toolCallId: 'c9', content: [{ type: 'image', attachment: ref }] }] }],
+  }
+  const chunks = []
+  for await (const chunk of adapter.stream(imageOptions)) chunks.push(chunk)
+  assert.equal(chunks.at(-1).type, 'finish')
+
+  const sent = JSON.parse(requests[0].init.body)
+  const toolMessage = sent.messages.find((message) => message.role === 'tool')
+  const expected = `data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`
+  assert.deepEqual(toolMessage.content, [{ type: 'image_url', image_url: { url: expected } }])
+})
+
 test('stream: the attachment seam resolves live when the store arrives after construction', async () => {
   const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 57])
   const ref = { attachmentId: 'att-late', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'late.png' }

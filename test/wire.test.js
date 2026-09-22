@@ -182,6 +182,27 @@ test('toOpenAiMessages: user tool-result blocks ride as tool messages, error mar
   ])
 })
 
+test('toOpenAiMessages: a nested tool-result image rides as image_url when resolved, placeholder otherwise', () => {
+  const image = { type: 'image', attachment: { name: 'shot.png', mediaType: 'image/png', width: 640, height: 480 } }
+  const options = {
+    messages: [
+      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'C:/x/shot.png' }, image] }] },
+    ],
+  }
+  const urls = new Map([[image, 'data:image/png;base64,QUJD']])
+  assert.deepEqual(toOpenAiMessages(options, urls), [
+    {
+      role: 'tool',
+      tool_call_id: 'c1',
+      content: [{ type: 'text', text: 'C:/x/shot.png' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,QUJD' } }],
+    },
+  ])
+  // Unreadable image: the same placeholder as the user-side projection, string form kept.
+  assert.deepEqual(toOpenAiMessages(options), [
+    { role: 'tool', tool_call_id: 'c1', content: 'C:/x/shot.png[image: shot.png 640x480]' },
+  ])
+})
+
 test('toOpenAiMessages: assistant with only tool calls gets null content', () => {
   const options = {
     messages: [
