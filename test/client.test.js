@@ -228,6 +228,21 @@ test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay
   assert.equal(keyless.apiKey, '')
 })
 
+test('toDraft: credentials are per-line — each line keeps its own key and the flat field mirrors the active line', () => {
+  const value = {
+    dialect: 'ninfer',
+    user: { lines: {} },
+    lines: {
+      ninfer: { apiKey: 'sk-ninfer' },
+      llamacpp: { apiKey: 'sk-llama' },
+    },
+  }
+  const draft = client.toDraft(value)
+  assert.equal(draft.apiKey, 'sk-ninfer')
+  assert.equal(draft.lines.llamacpp.apiKey, 'sk-llama')
+  assert.equal(draft.lines.tabbyapi.apiKey, '')
+})
+
 test('toDraft: a tabbyapi-active section lifts the ExLlamaV3 line onto the inputs', () => {
   const value = {
     dialect: 'tabbyapi',

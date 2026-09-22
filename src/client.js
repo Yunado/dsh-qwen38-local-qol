@@ -53,7 +53,7 @@ const COPY = {
     model: 'Model id',
     displayName: 'Display name',
     apiKey: 'API key',
-    apiKeyHint: 'Optional — empty keeps every line keyless. When set, each request carries Authorization: Bearer <key>. Shared by all lines.',
+    apiKeyHint: 'Optional — empty keeps this line keyless. When set, requests to THIS line carry Authorization: Bearer <key>. Each line stores its own key.',
     revealKey: 'Reveal the stored key',
     concealKey: 'Conceal the stored key',
     window: 'Window and output',
@@ -93,7 +93,7 @@ const COPY = {
     model: '模型 id',
     displayName: '显示名',
     apiKey: '接口密钥（API key）',
-    apiKeyHint: '可选——留空 = 各线无认证；填写后每个请求附带 Authorization: Bearer <key>。对所有线生效。',
+    apiKeyHint: '可选——留空 = 该线无认证；填写后该线请求附带 Authorization: Bearer <key>。每条线各存一份。',
     revealKey: '显示已存的密钥',
     concealKey: '隐藏已存的密钥',
     window: '窗口与输出',
@@ -198,6 +198,7 @@ function lineRecord(name, raw, fallback) {
     baseURL: src.baseURL ?? '',
     model: src.model ?? '',
     displayName: src.displayName ?? '',
+    apiKey: src.apiKey ?? '',
     contextWindow: String(src.contextWindow ?? d.contextWindow),
     maxTokens: String(src.maxTokens ?? d.maxTokens),
     low: String(src.thinkingBudgets?.low ?? 4096),
@@ -237,6 +238,7 @@ export function toDraft(value) {
     thinkingBudgets: value.thinkingBudgets,
     defaultThinkingBudget: value.defaultThinkingBudget,
     summarize: value.summarize,
+    apiKey: value.apiKey,
   } : undefined
   // The legacy top level belongs to the active line only; the other lines
   // park at their built-in defaults.
@@ -261,9 +263,10 @@ export function toDraft(value) {
     images: active.images,
     keepTurns: active.keepTurns,
     toolChars: active.toolChars,
-    // Top-level credential shared by every line (empty = keyless, the wire
-    // omits the Authorization header).
-    apiKey: String(value.apiKey ?? ''),
+    // Per-line credential: the flat field holds the ACTIVE line's key (empty =
+    // keyless, the wire omits the Authorization header); every line keeps its
+    // own copy under `lines`.
+    apiKey: active.apiKey,
   }
 }
 
@@ -273,6 +276,10 @@ function liftedInputs(record) {
     baseURL: record.baseURL,
     model: record.model,
     displayName: record.displayName,
+    // Per-line credential: each line stores its own key, so switching lines
+    // carries each one's key onto the inputs (the flat field mirrors the
+    // active line onto save).
+    apiKey: record.apiKey,
     contextWindow: record.contextWindow,
     maxTokens: record.maxTokens,
     low: record.low,
@@ -345,6 +352,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       baseURL: record.baseURL,
       model: record.model,
       displayName: record.displayName,
+      // This line's own credential (the flat patch field mirrors the active
+      // line; each parked line keeps its own copy here).
+      apiKey: record.apiKey,
       contextWindow: Number.parseInt(record.contextWindow, 10),
       maxTokens: Number.parseInt(record.maxTokens, 10),
       thinkingBudgets: {
