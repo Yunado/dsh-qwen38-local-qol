@@ -11,6 +11,8 @@
  * @module dsh-qwen38-local-qol/wire
  */
 
+import { DEFAULT_THINKING_BUDGETS } from './config.js'
+
 /** A message content block this adapter cannot represent on the wire. */
 export const UNSUPPORTED_CONTENT_CODE = 'UNSUPPORTED_CONTENT'
 
@@ -123,23 +125,45 @@ function messageContent(message, imageDataUrls = new Map()) {
 
 /**
  * Collect the `tool` wire messages carried by one user message's tool-result
- * blocks (a user message may carry several parallel results).
+ * blocks (a user message may carry several parallel results). Nested image
+ * blocks ride as `image_url` entries in a multimodal content array when their
+ * bytes resolved to a data URL; an unreadable one degrades to the same text
+ * placeholder the user-side projection uses, so the model sees that an image
+ * was there but not its pixels. Text-only results keep riding as the string
+ * form.
  * @param message - one harness user message.
+ * @param imageDataUrls - map from image block identity to data URL; a block
+ *   without an entry rides the placeholder path.
  * @returns wire tool messages in block order.
  */
-function toolResultMessages(message) {
+function toolResultMessages(message, imageDataUrls = new Map()) {
   const out = []
   for (const block of message.content ?? []) {
     if (block.type !== 'tool-result') continue
     let text = ''
+    const media = []
     for (const inner of block.content ?? []) {
-      if (inner.type === 'text') text += inner.text
+      if (inner.type === 'text') {
+        text += inner.text
+      } else if (inner.type === 'image') {
+        const dataUrl = imageDataUrls.get(inner)
+        if (dataUrl !== undefined) {
+          media.push({ type: 'image_url', image_url: { url: dataUrl } })
+        } else {
+          const { name, mediaType, width, height } = inner.attachment ?? {}
+          text += `[image: ${name ?? mediaType} ${width}x${height}]`
+        }
+      }
     }
-    out.push({
-      role: 'tool',
-      tool_call_id: block.toolCallId,
-      content: block.isError ? `[error] ${text}` : text,
-    })
+    const payload = block.isError ? `[error] ${text}` : text
+    if (media.length === 0) {
+      out.push({ role: 'tool', tool_call_id: block.toolCallId, content: payload })
+      continue
+    }
+    const content = []
+    if (payload !== '') content.push({ type: 'text', text: payload })
+    content.push(...media)
+    out.push({ role: 'tool', tool_call_id: block.toolCallId, content })
   }
   return out
 }
@@ -150,7 +174,8 @@ function toolResultMessages(message) {
  * `reasoning_content` field (the #1198 hardening default: signature-less
  * thinking blocks are not silently dropped), and tool calls ride `tool_calls`.
  * @param options - the assembled {@link GenerateOptions}.
- * @param imageDataUrls - map from (messageIndex, blockIndex) to data URL.
+ * @param imageDataUrls - map from image block identity to data URL; blocks
+ *   without an entry degrade to the placeholder.
  * @returns wire messages in conversation order.
  */
 export function toOpenAiMessages(options, imageDataUrls = new Map()) {
@@ -182,13 +207,13 @@ export function toOpenAiMessages(options, imageDataUrls = new Map()) {
       continue
     }
     if (message.role === 'tool') {
-      const tools = toolResultMessages(message)
+      const tools = toolResultMessages(message, imageDataUrls)
       if (tools.length === 0) messages.push({ role: message.role, content: '' })
       else messages.push(...tools)
       continue
     }
     // user (and any unknown role falls through to the plain projection)
-    const tools = toolResultMessages(message)
+    const tools = toolResultMessages(message, imageDataUrls)
     const content = messageContent(message, imageDataUrls)
     if (content !== '' || tools.length === 0) messages.push({ role: message.role, content })
     messages.push(...tools)
@@ -298,13 +323,19 @@ export function buildQwenBody(options, fallbackModel, config, imageDataUrls) {
   }
   body.chat_template_kwargs = kwargs
 
-  const budget = thinkingOn ? config.thinkingBudgets?.[effort] : undefined
+  // Per-level hard cap; when the selected level has no budget configured,
+  // fall back to the xhigh tier value so a thinking-on request is always
+  // capped (a missing per-level entry must not mean "think without a cap").
+  // The field travels per dialect: oMLX natively reads `thinking_budget`,
+  // every other line reads `reasoning_budget_tokens`.
+  const budgets = config.thinkingBudgets
+  const budget = !thinkingOn
+    ? undefined
+    : typeof budgets?.[effort] === 'number'
+      ? budgets[effort]
+      : budgets?.xhigh ?? DEFAULT_THINKING_BUDGETS.xhigh
   if (typeof budget === 'number') {
-    if (config.dialect === 'omlx') {
-      body.thinking_budget = budget
-    } else {
-      body.reasoning_budget_tokens = budget
-    }
+    body[config.dialect === 'omlx' ? 'thinking_budget' : 'reasoning_budget_tokens'] = budget
   }
 
   return body

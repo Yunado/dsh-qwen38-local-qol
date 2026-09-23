@@ -33,6 +33,14 @@ const NS = 'qwen38-local-qol'
 /** The generated preset id (mirrors the host's `PRESET_ID`). */
 const PRESET_ID = 'qwen38'
 
+/** Password-reveal icons: an open eye while revealed, a slashed eye while concealed. */
+const EYE_OPEN = React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ariaHidden: true },
+  React.createElement('path', { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z' }),
+  React.createElement('circle', { cx: 12, cy: 12, r: 3 }))
+const EYE_CLOSED = React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ariaHidden: true },
+  React.createElement('path', { d: 'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.17 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' }),
+  React.createElement('line', { x1: 1, y1: 1, x2: 23, y2: 23 }))
+
 const COPY = {
   en: {
     title: 'Qwen3.8 Local',
@@ -45,6 +53,10 @@ const COPY = {
     baseURL: 'Server base URL',
     model: 'Model id',
     displayName: 'Display name',
+    apiKey: 'API key',
+    apiKeyHint: 'Empty = keyless. When set, requests carry Authorization: Bearer <key>.',
+    revealKey: 'Reveal the stored key',
+    concealKey: 'Conceal the stored key',
     window: 'Window and output',
     contextWindow: 'Context window (tokens)',
     maxTokens: 'Output cap (tokens)',
@@ -83,6 +95,10 @@ const COPY = {
     baseURL: '服务器地址',
     model: '模型 id',
     displayName: '显示名',
+    apiKey: '接口密钥（API key）',
+    apiKeyHint: '留空 = 无认证；填写后请求带 Authorization: Bearer <key>。',
+    revealKey: '显示已存的密钥',
+    concealKey: '隐藏已存的密钥',
     window: '窗口与输出',
     contextWindow: '上下文窗口（token）',
     maxTokens: '输出上限（token）',
@@ -160,13 +176,13 @@ function digitsOnly(setValue) {
 
 /**
  * The built-in window defaults per line, mirroring `resolveConfig`: every
- * 224K line (llama.cpp, NInfer) opens on 229376/24576; the ExLlamaV3 line
- * (TabbyAPI) opens on its 256K context and its narrow-band output cap.
+ * standard line opens on a 256K context with the ~20%-of-window output cap
+ * (headroom for the compaction trigger at 0.8× contextWindow).
  */
 const LINE_WINDOW_DEFAULTS = Object.freeze({
-  ninfer: { contextWindow: 229376, maxTokens: 24576 },
-  llamacpp: { contextWindow: 229376, maxTokens: 24576 },
-  tabbyapi: { contextWindow: 262144, maxTokens: 57344 },
+  ninfer: { contextWindow: 262144, maxTokens: 52428 },
+  llamacpp: { contextWindow: 262144, maxTokens: 52428 },
+  tabbyapi: { contextWindow: 262144, maxTokens: 52428 },
   omlx: { contextWindow: 64000, maxTokens: 16384 },
 })
 
@@ -187,6 +203,7 @@ function lineRecord(name, raw, fallback) {
     baseURL: src.baseURL ?? '',
     model: src.model ?? '',
     displayName: src.displayName ?? '',
+    apiKey: src.apiKey ?? '',
     contextWindow: String(src.contextWindow ?? d.contextWindow),
     maxTokens: String(src.maxTokens ?? d.maxTokens),
     low: String(src.thinkingBudgets?.low ?? 4096),
@@ -226,6 +243,7 @@ export function toDraft(value) {
     thinkingBudgets: value.thinkingBudgets,
     defaultThinkingBudget: value.defaultThinkingBudget,
     summarize: value.summarize,
+    apiKey: value.apiKey,
   } : undefined
   // The legacy top level belongs to the active line only; the other lines
   // park at their built-in defaults.
@@ -251,6 +269,10 @@ export function toDraft(value) {
     images: active.images,
     keepTurns: active.keepTurns,
     toolChars: active.toolChars,
+    // Per-line credential: the flat field holds the ACTIVE line's key (empty =
+    // keyless, the wire omits the Authorization header); every line keeps its
+    // own copy under `lines`.
+    apiKey: active.apiKey,
   }
 }
 
@@ -260,6 +282,10 @@ function liftedInputs(record) {
     baseURL: record.baseURL,
     model: record.model,
     displayName: record.displayName,
+    // Per-line credential: each line stores its own key, so switching lines
+    // carries each one's key onto the inputs (the flat field mirrors the
+    // active line onto save).
+    apiKey: record.apiKey,
     contextWindow: record.contextWindow,
     maxTokens: record.maxTokens,
     low: record.low,
@@ -277,6 +303,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const locale = useLocale((snapshot) => (snapshot.active === 'zh' ? 'zh' : 'en'))
   const t = COPY[locale]
   const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false, agentPresets: null })
+  // Password-style display for the API key: masked by default, the eye button
+  // toggles between revealing and concealing the stored value.
+  const [revealedKey, setRevealedKey] = React.useState(false)
 
   const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
 
@@ -329,6 +358,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       baseURL: record.baseURL,
       model: record.model,
       displayName: record.displayName,
+      // This line's own credential (the flat patch field mirrors the active
+      // line; each parked line keeps its own copy here).
+      apiKey: record.apiKey,
       contextWindow: Number.parseInt(record.contextWindow, 10),
       maxTokens: Number.parseInt(record.maxTokens, 10),
       thinkingBudgets: {
@@ -366,6 +398,8 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       baseURL: draft.baseURL,
       model: draft.model,
       displayName: draft.displayName,
+      // The credential rides the section top level, not a line record.
+      apiKey: draft.apiKey,
       lines: {
         ninfer: lineBlock(persistedLines.ninfer),
         llamacpp: lineBlock(persistedLines.llamacpp),
@@ -444,6 +478,28 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         React.createElement(Input, { className: 'qol-input', value: draft.model, onChange: (e) => { setDraft({ model: e.target.value }) } })),
       React.createElement(Field, { label: t.displayName },
         React.createElement(Input, { className: 'qol-input', value: draft.displayName, onChange: (e) => { setDraft({ displayName: e.target.value }) } })),
+      React.createElement(Field, { label: t.apiKey },
+        // The eye toggle overlays the right edge of the key input (close-aligned
+        // to the slot) and swaps between the open and closed icons on click.
+        React.createElement('div', { style: { position: 'relative' } },
+          React.createElement(Input, {
+            className: 'qol-input',
+            type: revealedKey ? 'text' : 'password',
+            value: draft.apiKey,
+            onChange: (e) => { setDraft({ apiKey: e.target.value }) },
+            style: { paddingRight: 34 },
+          }),
+          React.createElement('button', {
+            type: 'button',
+            title: revealedKey ? t.concealKey : t.revealKey,
+            onClick: () => { setRevealedKey((v) => !v) },
+            style: {
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', color: '#8b93a7', padding: 4,
+              display: 'flex', alignItems: 'center',
+            },
+          }, revealedKey ? EYE_OPEN : EYE_CLOSED))),
+      React.createElement('p', { className: 'qol-hint' }, t.apiKeyHint),
     ),
     React.createElement('section', { className: 'qol-group' },
       React.createElement('h3', { className: 'qol-groupHead' }, t.window),

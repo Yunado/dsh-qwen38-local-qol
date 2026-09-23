@@ -59,6 +59,7 @@ test('sectionSchema: lines carry each dialect production defaults (connection + 
     baseURL: DEFAULT_BASE_URL,
     model: DEFAULT_MODEL,
     displayName: '',
+    apiKey: '',
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     maxTokens: DEFAULT_MAX_TOKENS,
     thinkingBudgets: { ...DEFAULT_THINKING_BUDGETS },
@@ -77,11 +78,13 @@ test('sectionSchema: lines carry each dialect production defaults (connection + 
 
 test('sectionSchema: a user-saved line persists over its own defaults', () => {
   const resolved = sectionSchema()({
-    lines: { llamacpp: { baseURL: 'http://localhost:9999/v1', model: 'some-alias', displayName: 'LLM', contextWindow: 131072, defaultThinkingBudget: 32768, summarize: { images: 'keep', keepTurns: 3, toolChars: 1000 } } },
+    lines: { llamacpp: { baseURL: 'http://localhost:9999/v1', model: 'some-alias', displayName: 'LLM', apiKey: 'sk-line-key', contextWindow: 131072, defaultThinkingBudget: 32768, summarize: { images: 'keep', keepTurns: 3, toolChars: 1000 } } },
   })
   assert.equal(resolved.lines.llamacpp.baseURL, 'http://localhost:9999/v1')
   assert.equal(resolved.lines.llamacpp.model, 'some-alias')
   assert.equal(resolved.lines.llamacpp.displayName, 'LLM')
+  assert.equal(resolved.lines.llamacpp.apiKey, 'sk-line-key')
+  assert.equal(resolved.lines.ninfer.apiKey, '')
   assert.equal(resolved.lines.llamacpp.contextWindow, 131072)
   assert.equal(resolved.lines.llamacpp.maxTokens, DEFAULT_MAX_TOKENS)
   assert.equal(resolved.lines.llamacpp.defaultThinkingBudget, 32768)

@@ -12,7 +12,7 @@
  * (`~/.dsh/.agent-presets/qwen38/agent.cordis.yml`, via
  * {@link dsh-qwen38-local-qol/setup}), inside the preset's isolated compaction
  * group. The row config is the stock `BasicCompactionConfig`; the only
- * recommended row value is `maxTokens: 24576` (the stock 8192 default
+ * recommended row value is `maxTokens: 52428` (the stock 8192 default
  * truncates long local checkpoints); the wire also raises any compaction
  * call to the line's output cap, which covers presets without this row. The
  * trim knobs come from the user-settings

@@ -62,8 +62,8 @@ export const BACKEND_ROW_ID = 'compaction-basic'
  * `./backend`.
  */
 export const BACKEND_PACKAGE = 'dsh-qwen38-local-qol/backend'
-/** The stock config value pinned on the backend row (8192 truncates long local checkpoints; 16384 proved tight on the 125B line). */
-export const BACKEND_MAX_TOKENS = 24576
+/** The config value pinned on the backend row: matches the plugin output cap (~20% of the 256K window); the stock 8192 truncates long local checkpoints. */
+export const BACKEND_MAX_TOKENS = 52428
 /** The user settings file at the DSH home root. */
 export const SETTINGS_FILE = 'settings.yaml'
 /** The settings section that carries the default agent preset. */
@@ -211,12 +211,44 @@ export function ensureDefaultPreset(dshHome) {
 
 /**
  * Render the preset.yml document published beside the generated composition.
- * @returns the YAML text (the name and description keys as locale maps).
+ * The name and description keys are unlocalized scalars (stock DSH trees
+ * parse only the scalar form), in the reader's locale: the label follows the
+ * DSH home's `locale.preference` setting at generation time, and a changed
+ * preference rewrites the metadata on the next start. The per-locale
+ * dictionaries stay the source.
+ * @param locale - the locale id to render ('zh' picks the zh labels; any
+ *   other value, including undefined, renders en).
+ * @returns the YAML text.
  */
-export function renderPresetMetadata() {
-  const names = Object.entries(PRESET_NAMES).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  const descriptions = Object.entries(PRESET_DESCRIPTIONS).map(([locale, label]) => `  ${locale}: ${label}`).join('\n')
-  return `name:\n${names}\ndescription:\n${descriptions}\n`
+export function renderPresetMetadata(locale) {
+  const pick = (entries) => (locale === 'zh' ? entries.zh : entries.en)
+  return `name: ${pick(PRESET_NAMES)}\ndescription: ${pick(PRESET_DESCRIPTIONS)}\n`
+}
+
+/**
+ * Read the locale preference from a `settings.yaml` text. Lenient read
+ * (same discipline as the default preset reader): the first top-level
+ * `locale:` plain block's first `preference:` key; an inline entry, a
+ * duplicated section, or a section without the key all answer undefined.
+ * @param text - the settings.yaml content; '' for a missing or empty file.
+ * @returns the locale id ('zh', 'en', ...), or undefined.
+ */
+export function readLocalePreference(text) {
+  const lines = text.split('\n')
+  let sectionIndex = -1
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^locale:\s*$/.test(lines[i])) { sectionIndex = i; break }
+  }
+  if (sectionIndex === -1) return undefined
+  let sectionEnd = lines.length
+  for (let i = sectionIndex + 1; i < lines.length; i += 1) {
+    if (/^[^\s#]/.test(lines[i])) { sectionEnd = i; break }
+  }
+  for (let i = sectionIndex + 1; i < sectionEnd; i += 1) {
+    const match = lines[i].match(/^\s+preference:\s*(\S+)/)
+    if (match !== null) return match[1]
+  }
+  return undefined
 }
 
 /**
@@ -296,9 +328,11 @@ export function writeGeneratedPreset(dshHome, sourceText, { overwrite = true } =
   if (!overwrite && (existsSync(target) || existsSync(metadataTarget))) {
     throw new Error(`dsh-qwen38-local-qol: setup: the preset already exists at ${target}; remove it to regenerate`)
   }
+  const settingsPath = join(dshHome, SETTINGS_FILE)
+  const locale = existsSync(settingsPath) ? readLocalePreference(readFileSync(settingsPath, 'utf8')) : undefined
   mkdirSync(dir, { recursive: true })
   writeIfChanged(target, transformed)
-  writeIfChanged(metadataTarget, renderPresetMetadata())
+  writeIfChanged(metadataTarget, renderPresetMetadata(locale))
   return { preset: target, metadata: metadataTarget }
 }
 
@@ -348,16 +382,36 @@ export function resolveStandardSource(dshHome) {
 }
 
 /**
+ * Re-render the generated preset's display metadata against the DSH home's
+ * current `locale.preference`, touching the file only when the rendered
+ * language actually changes (writeIfChanged); the composition is left
+ * untouched. Lets a changed locale reach the card label on the next start
+ * without regenerating the preset.
+ * @param dshHome - the DSH home directory.
+ * @returns the metadata path, or undefined when the preset itself is missing.
+ */
+export function refreshPresetMetadata(dshHome) {
+  const dir = join(dshHome, USER_PRESET_DIR, PRESET_ID)
+  if (!existsSync(join(dir, 'agent.cordis.yml'))) return undefined
+  const settingsPath = join(dshHome, SETTINGS_FILE)
+  const locale = existsSync(settingsPath) ? readLocalePreference(readFileSync(settingsPath, 'utf8')) : undefined
+  writeIfChanged(join(dir, PRESET_METADATA_FILE), renderPresetMetadata(locale))
+  return join(dir, PRESET_METADATA_FILE)
+}
+
+/**
  * Self-apply the compaction wiring (the setup CLI's one-shot, made
  * automatic): generate the user preset from the standard preset's
- * composition when it is missing, and set the default agent preset only when
- * no default is configured yet — an explicit user choice (any value) is
- * respected on every later boot. Idempotent: an existing preset and an
- * existing default are left untouched.
+ * composition when it is missing, re-render the display metadata of an
+ * existing preset against the current locale preference, and set the default
+ * agent preset only when no default is configured yet — an explicit user
+ * choice (any value) is respected on every later boot. Idempotent: an
+ * existing preset and an existing default are left untouched (the metadata
+ * scalars excepted — a changed locale rewrites only those).
  * @param dshHome - the DSH home directory.
  * @returns what changed: `applied` (the preset was generated this call), the
- *   `preset`/`metadata` paths (undefined when the preset already existed),
- *   and `defaultChanged` ('created', 'appended', or 'none').
+ *   `preset`/`metadata` paths (undefined when the preset already existed /
+ *   is missing), and `defaultChanged` ('created', 'appended', or 'none').
  * @throws {Error} when no standard source is readable or a write fails (the
  *   caller logs it; the dot stays grey until the next start fixes it).
  */
@@ -371,6 +425,8 @@ export function autoApplyCompaction(dshHome) {
     preset = written.preset
     metadata = written.metadata
     applied = true
+  } else {
+    metadata = refreshPresetMetadata(dshHome)
   }
   // The lenient read answers undefined for a missing or key-less block; an
   // explicit default (any value) is respected and never replaced at boot.

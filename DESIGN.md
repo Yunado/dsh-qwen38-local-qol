@@ -127,7 +127,7 @@ profile（其 tui profile）有效。
 | `summarizeImages` | `'strip'` | 现有补丁 3 knob 原样（`'strip'\|'keep'`） |
 | `summarizeReasoningKeepTurns` | `5` | `0` = 全剥 |
 | `summarizeToolResultMaxChars` | `2000` | `0` = 不截 |
-| `maxTokens` | `24576` | 摘要帽（绕开 preset isolated group 的 8192 死角：后端自持） |
+| `maxTokens` | `52428` | 摘要帽（= 插件输出帽 ~20% 窗口余量；绕开 preset isolated group 的 8192 死角：后端自持） |
 
 ## 5. Wire 映射（多方言分道）
 

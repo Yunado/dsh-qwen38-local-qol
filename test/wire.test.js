@@ -147,10 +147,15 @@ test('buildQwenBody: compaction purpose keeps the line output cap over the engin
   assert.equal(normal.max_tokens, 24576)
 })
 
-test('buildQwenBody: effort without a configured budget sends no budget field', () => {
+test('buildQwenBody: effort without a configured per-level budget rides the xhigh tier value', () => {
+  // A partial budget map must not mean "think without a cap": the selected
+  // level without its own entry falls back to the xhigh tier value.
   const config = { ...NINFER, thinkingBudgets: { low: 4096 } }
   const body = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', config)
-  assert.ok(!('reasoning_budget_tokens' in body))
+  assert.equal(body.reasoning_budget_tokens, 16384)
+  // An entirely absent budgets map caps at the built-in xhigh value too.
+  const bare = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', { dialect: 'ninfer', includeUsage: false })
+  assert.equal(bare.reasoning_budget_tokens, 16384)
 })
 
 test('buildQwenBody: model falls back to the configured id', () => {
@@ -202,6 +207,27 @@ test('toOpenAiMessages: user tool-result blocks ride as tool messages, error mar
   assert.deepEqual(messages, [
     { role: 'user', content: 'look' },
     { role: 'tool', tool_call_id: 'c2', content: '[error] boom' },
+  ])
+})
+
+test('toOpenAiMessages: a nested tool-result image rides as image_url when resolved, placeholder otherwise', () => {
+  const image = { type: 'image', attachment: { name: 'shot.png', mediaType: 'image/png', width: 640, height: 480 } }
+  const options = {
+    messages: [
+      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'C:/x/shot.png' }, image] }] },
+    ],
+  }
+  const urls = new Map([[image, 'data:image/png;base64,QUJD']])
+  assert.deepEqual(toOpenAiMessages(options, urls), [
+    {
+      role: 'tool',
+      tool_call_id: 'c1',
+      content: [{ type: 'text', text: 'C:/x/shot.png' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,QUJD' } }],
+    },
+  ])
+  // Unreadable image: the same placeholder as the user-side projection, string form kept.
+  assert.deepEqual(toOpenAiMessages(options), [
+    { role: 'tool', tool_call_id: 'c1', content: 'C:/x/shot.png[image: shot.png 640x480]' },
   ])
 })
 

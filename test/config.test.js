@@ -17,8 +17,8 @@ test('resolveConfig: built-in defaults open on the general default (llama.cpp li
   assert.equal(resolveConfig({ dialect: 'ninfer' }, {}).model, DEFAULT_MODEL)
   assert.equal(resolved.apiKey, undefined)
   assert.equal(resolved.dialect, 'llamacpp')
-  assert.equal(resolved.contextWindow, 229376)
-  assert.equal(resolved.maxTokens, 24576)
+  assert.equal(resolved.contextWindow, 262144)
+  assert.equal(resolved.maxTokens, 52428)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
   assert.deepEqual(resolved.provider, ['qwen38'])
   // Usage reporting is on by default for both dialects: NInfer 0.5.0 and
@@ -80,7 +80,7 @@ test('resolveConfig: the tabbyapi line opens on its own defaults', () => {
   assert.equal(resolved.baseURL, 'http://localhost:8083/v1')
   assert.equal(resolved.model, 'Qwen3.8-Flash-Next-4.05bpw')
   assert.equal(resolved.contextWindow, 262144)
-  assert.equal(resolved.maxTokens, 57344)
+  assert.equal(resolved.maxTokens, 52428)
 })
 
 test('resolveConfig: the omlx line opens on its own defaults and supports OMLX_API_KEY', () => {
@@ -107,10 +107,10 @@ test('resolveConfig: budget map drops malformed entries, falls back when all dro
 })
 
 test('resolveConfig: integer settings accept positive integers only, env accepts digit strings', () => {
-  assert.equal(resolveConfig({ contextWindow: 0 }, {}).contextWindow, 229376)
+  assert.equal(resolveConfig({ contextWindow: 0 }, {}).contextWindow, 262144)
   assert.equal(resolveConfig({ contextWindow: 123 }, {}).contextWindow, 123)
   assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: '99999' }).contextWindow, 99999)
-  assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: 'abc' }).contextWindow, 229376)
+  assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: 'abc' }).contextWindow, 262144)
 })
 
 test('resolveConfig: provider list trims and filters empties, falls back when empty', () => {

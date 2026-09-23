@@ -153,8 +153,8 @@ test('client: a stale-revision write answers a conflict the caller can re-load',
 
 test('toDraft: a fresh section (no user layer) ships the production defaults pre-filled', () => {
   const draft = client.toDraft({ dialect: 'ninfer', baseURL: 'http://localhost:8082/v1', model: 'qwen3.8-27b-nvfp4' })
-  assert.equal(draft.contextWindow, '229376')
-  assert.equal(draft.maxTokens, '24576')
+  assert.equal(draft.contextWindow, '262144')
+  assert.equal(draft.maxTokens, '52428')
   assert.equal(draft.low, '4096')
   assert.equal(draft.medium, '8192')
   assert.equal(draft.xhigh, '16384')
@@ -165,12 +165,14 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   // Legacy shape (no user.lines): the active line migrates from the top level.
   assert.equal(draft.baseURL, 'http://localhost:8082/v1')
   assert.equal(draft.model, 'qwen3.8-27b-nvfp4')
+  // The top-level credential defaults to empty (keyless = no Authorization header).
+  assert.equal(draft.apiKey, '')
   // The other lines park at their built-in defaults.
   assert.equal(draft.lines.llamacpp.baseURL, '')
-  assert.equal(draft.lines.llamacpp.contextWindow, '229376')
+  assert.equal(draft.lines.llamacpp.contextWindow, '262144')
   assert.equal(draft.lines.tabbyapi.baseURL, '')
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '57344')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
   assert.equal(draft.lines.omlx.baseURL, '')
   assert.equal(draft.lines.omlx.contextWindow, '64000')
   assert.equal(draft.lines.omlx.maxTokens, '16384')
@@ -219,10 +221,32 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   // The unpersisted TabbyAPI and oMLX lines park at their built-in defaults.
   assert.equal(draft.lines.tabbyapi.baseURL, '')
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '57344')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
   assert.equal(draft.lines.omlx.baseURL, '')
   assert.equal(draft.lines.omlx.contextWindow, '64000')
   assert.equal(draft.lines.omlx.maxTokens, '16384')
+})
+
+test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {
+  const keyed = client.toDraft({ dialect: 'ninfer', apiKey: 'sk-stored' })
+  assert.equal(keyed.apiKey, 'sk-stored')
+  const keyless = client.toDraft({ dialect: 'ninfer' })
+  assert.equal(keyless.apiKey, '')
+})
+
+test('toDraft: credentials are per-line — each line keeps its own key and the flat field mirrors the active line', () => {
+  const value = {
+    dialect: 'ninfer',
+    user: { lines: {} },
+    lines: {
+      ninfer: { apiKey: 'sk-ninfer' },
+      llamacpp: { apiKey: 'sk-llama' },
+    },
+  }
+  const draft = client.toDraft(value)
+  assert.equal(draft.apiKey, 'sk-ninfer')
+  assert.equal(draft.lines.llamacpp.apiKey, 'sk-llama')
+  assert.equal(draft.lines.tabbyapi.apiKey, '')
 })
 
 test('toDraft: a tabbyapi-active section lifts the ExLlamaV3 line onto the inputs', () => {

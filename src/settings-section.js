@@ -62,6 +62,10 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets) {
     baseURL: Schema.string().default(baseURL),
     model: Schema.string().default(model),
     displayName: Schema.string().default(''),
+    // This line's own server credential (empty = keyless). The tab persists
+    // one per line; the top-level `apiKey` mirrors the ACTIVE line and is
+    // what the adapter sends (Authorization: Bearer).
+    apiKey: Schema.string().default(''),
     contextWindow: Schema.number().default(contextWindow),
     maxTokens: Schema.number().default(maxTokens),
     thinkingBudgets: Schema.object({

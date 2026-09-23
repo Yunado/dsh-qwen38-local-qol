@@ -11,8 +11,8 @@ const CONFIG = {
   model: 'qwen',
   apiKey: undefined,
   dialect: 'ninfer',
-  contextWindow: 229376,
-  maxTokens: 24576,
+  contextWindow: 262144,
+  maxTokens: 52428,
   thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 },
   thinkingLevelMap: {},
   includeUsage: false,
@@ -61,7 +61,7 @@ const options = () => ({
   provider: 'qwen38',
   model: 'qwen',
   reasoningEffort: 'medium',
-  maxTokens: 24576,
+  maxTokens: 52428,
   system: 'sys',
   messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
   signal: new AbortController().signal,
@@ -95,7 +95,7 @@ test('stream: reasoning + text + usage with reasoning tokens, terminal finish', 
   assert.equal(sent.reasoning_effort, 'medium')
   assert.deepEqual(sent.chat_template_kwargs, { enable_thinking: true })
   assert.equal(sent.reasoning_budget_tokens, 8192)
-  assert.equal(sent.max_tokens, 24576)
+  assert.equal(sent.max_tokens, 52428)
   assert.equal(sent.stream, true)
   assert.equal(sent.model, 'qwen')
   assert.deepEqual(sent.messages[0], { role: 'system', content: 'sys' })
@@ -139,6 +139,31 @@ test('stream: HTTP error surfaces with the stable code and status', async () => 
   await assert.rejects(
     (async () => { for await (const _ of adapter.stream(options())) { /* drain */ } })(),
     (error) => error.code === 'PROVIDER_HTTP_ERROR' && /HTTP 400/.test(error.message) && /thinking_budget_capacity_insufficient/.test(error.message),
+  )
+})
+
+test('stream: a vision media-budget 400 classifies as CONTEXT_WINDOW_EXCEEDED', async () => {
+  const response = {
+    ok: false,
+    status: 400,
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify({
+      error: {
+        code: 'media_budget_exceeded',
+        message: 'vision raw patches exceed processor budget',
+        param: 'messages',
+        type: 'invalid_request_error',
+      },
+    }),
+    body: null,
+  }
+  const { fetch } = fakeFetch(response)
+  const adapter = new QwenLocalAdapter({ ...CONFIG, fetch })
+  await assert.rejects(
+    (async () => { for await (const _ of adapter.stream(options())) { /* drain */ } })(),
+    (error) => error.code === 'CONTEXT_WINDOW_EXCEEDED'
+      && /HTTP 400/.test(error.message)
+      && /media_budget_exceeded/.test(error.message),
   )
 })
 
@@ -249,6 +274,31 @@ test('stream: user image blocks resolve to image_url data URLs through the attac
   assert.ok(userMessage.content.some((entry) => entry.type === 'text' && entry.text === 'look'))
 })
 
+test('stream: a nested tool-result image resolves to a multimodal tool content array', async () => {
+  const pngBytes = new Uint8Array([137, 80, 78, 73, 13, 10, 26, 10])
+  const ref = { attachmentId: 'att-t1', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'shot.png' }
+  const attachment = { readImage: async () => ({ ref, data: pngBytes }) }
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+    'data: [DONE]\n\n',
+  ]
+  const { fetch, requests } = fakeFetch(sseResponse(frames))
+  const adapter = new QwenLocalAdapter({ ...CONFIG, attachment, fetch })
+  const imageOptions = {
+    ...options(),
+    messages: [{ role: 'user', content: [{ type: 'tool-result', toolCallId: 'c9', content: [{ type: 'image', attachment: ref }] }] }],
+  }
+  const chunks = []
+  for await (const chunk of adapter.stream(imageOptions)) chunks.push(chunk)
+  assert.equal(chunks.at(-1).type, 'finish')
+
+  const sent = JSON.parse(requests[0].init.body)
+  const toolMessage = sent.messages.find((message) => message.role === 'tool')
+  const expected = `data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`
+  assert.deepEqual(toolMessage.content, [{ type: 'image_url', image_url: { url: expected } }])
+})
+
 test('stream: the attachment seam resolves live when the store arrives after construction', async () => {
   const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 57])
   const ref = { attachmentId: 'att-late', mediaType: 'image/png', bytes: 8, width: 2, height: 2, name: 'late.png' }
@@ -307,8 +357,8 @@ test('resolveModel: context capacity and the effort vocabulary with budgets', as
   const info = await adapter.resolveModel('qwen38', 'qwen')
   assert.equal(info.provider, 'qwen38')
   assert.equal(info.id, 'qwen')
-  assert.deepEqual(info.context, { contextWindow: 229376 })
-  assert.equal(info.defaultMaxTokens, 24576)
+  assert.deepEqual(info.context, { contextWindow: 262144 })
+  assert.equal(info.defaultMaxTokens, 52428)
   assert.deepEqual(info.inputModalities, ['text', 'image'])
   const ids = info.reasoning.efforts.map((effort) => effort.id)
   assert.deepEqual(ids, ['off', 'low', 'medium', 'xhigh'])

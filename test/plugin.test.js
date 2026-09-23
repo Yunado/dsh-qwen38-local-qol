@@ -98,7 +98,7 @@ test('apply: installs the user-settings section; the adapter reads the live reso
     assert.equal(installCalls[0].ns, 'qwen38-local-qol')
     // The base is the fully resolved row (every field present), not the raw config.
     assert.equal(installCalls[0].entry.model, 'qwen3.8-27b')
-    assert.equal(installCalls[0].entry.contextWindow, 229376)
+    assert.equal(installCalls[0].entry.contextWindow, 262144)
 
     // First request: the default general line (the llama.cpp wire: effort
     // travels in chat_template_kwargs, the budget rides top-level on both
@@ -238,7 +238,7 @@ test('apply: auto-applies the compaction preset at boot, before the status snaps
     assert.ok(existsSync(presetFile))
     const written = readFileSync(presetFile, 'utf8')
     assert.ok(written.includes('dsh-qwen38-local-qol/backend'))
-    assert.ok(written.includes('maxTokens: 24576'))
+    assert.ok(written.includes('maxTokens: 52428'))
     assert.equal(base.compaction.presetGenerated, true)
     assert.equal(base.compaction.defaultPreset, 'qwen38')
     const settingsText = readFileSync(join(home, 'settings.yaml'), 'utf8')

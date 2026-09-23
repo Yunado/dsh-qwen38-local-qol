@@ -17,6 +17,7 @@ import {
   renderPresetMetadata,
   readDefaultAgentPreset,
   readCompactionStatus,
+  readLocalePreference,
   writeGeneratedPreset,
   PRESET_ID,
   PRESET_DESCRIPTIONS,
@@ -166,10 +167,18 @@ test('applyDefaultPreset: leaves a nested agent-presets key alone', () => {
   assert.ok(text.includes('plugins:\n  agent-presets: true'))
 })
 
-test('renderPresetMetadata: publishes the name and description as locale maps', () => {
+test('renderPresetMetadata: unlocalized scalars in the requested locale (stock trees parse only the scalar form)', () => {
   assert.equal(PRESET_DESCRIPTIONS.zh, '标准模式 + 自定义压缩')
   assert.equal(PRESET_DESCRIPTIONS.en, 'Standard mode + custom compaction')
-  assert.equal(renderPresetMetadata(), 'name:\n  zh: Qwen38模式\n  en: Qwen38 mode\ndescription:\n  zh: 标准模式 + 自定义压缩\n  en: Standard mode + custom compaction\n')
+  assert.equal(renderPresetMetadata('zh'), 'name: Qwen38模式\ndescription: 标准模式 + 自定义压缩\n')
+  assert.equal(renderPresetMetadata('en'), 'name: Qwen38 mode\ndescription: Standard mode + custom compaction\n')
+  assert.equal(renderPresetMetadata(undefined), 'name: Qwen38 mode\ndescription: Standard mode + custom compaction\n')
+})
+
+test('readLocalePreference: lenient read of the locale preference key', () => {
+  assert.equal(readLocalePreference('locale:\n  preference: zh\n  other: x\n'), 'zh')
+  assert.equal(readLocalePreference('locale:\n  other: x\n'), undefined)
+  assert.equal(readLocalePreference('agent-presets:\n  default: standard\n'), undefined)
 })
 
 test('readDefaultAgentPreset: lenient read of the default preset key', () => {
@@ -244,6 +253,40 @@ test('autoApplyCompaction: first run generates and sets the default; re-runs and
     assert.equal(third.applied, false)
     assert.equal(third.defaultChanged, 'none')
     assert.equal(readFileSync(join(home, 'settings.yaml'), 'utf8'), 'agent-presets:\n  default: standard\n')
+  } finally {
+    if (realSource === undefined) delete process.env.DSH_QWEN38_PRESET_SRC
+    else process.env.DSH_QWEN38_PRESET_SRC = realSource
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('autoApplyCompaction: an existing preset keeps its composition but re-renders the metadata to the current locale', () => {
+  const home = mkdtempSync(join(tmpdir(), 'qol-auto-apply-locale-'))
+  const source = join(home, 'standard.cordis.yml')
+  writeFileSync(source, PRESET)
+  const realSource = process.env.DSH_QWEN38_PRESET_SRC
+  process.env.DSH_QWEN38_PRESET_SRC = source
+  try {
+    writeFileSync(join(home, 'settings.yaml'), 'locale:\n  preference: en\n')
+    const first = autoApplyCompaction(home)
+    assert.equal(first.applied, true)
+    const presetDir = join(home, '.agent-presets', 'qwen38')
+    const metadataPath = join(presetDir, 'preset.yml')
+    assert.match(readFileSync(metadataPath, 'utf8'), /Qwen38 mode/)
+
+    // The user switches the locale: the next boot re-renders the label while
+    // the composition stays byte-for-byte untouched.
+    const composition = readFileSync(join(presetDir, 'agent.cordis.yml'), 'utf8')
+    writeFileSync(join(home, 'settings.yaml'), 'locale:\n  preference: zh\n')
+    const second = autoApplyCompaction(home)
+    assert.equal(second.applied, false)
+    assert.match(readFileSync(metadataPath, 'utf8'), /Qwen38模式/)
+    assert.equal(readFileSync(join(presetDir, 'agent.cordis.yml'), 'utf8'), composition)
+
+    // Same locale again: idempotent — no rewrite, no new backup.
+    const before = readdirSync(presetDir).sort()
+    autoApplyCompaction(home)
+    assert.deepEqual(readdirSync(presetDir).sort(), before)
   } finally {
     if (realSource === undefined) delete process.env.DSH_QWEN38_PRESET_SRC
     else process.env.DSH_QWEN38_PRESET_SRC = realSource

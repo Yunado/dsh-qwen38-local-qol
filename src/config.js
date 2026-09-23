@@ -59,21 +59,25 @@ export const DIALECT_OMLX = 'omlx'
  */
 export const DIALECTS = Object.freeze([DIALECT_LLAMACPP, DIALECT_NINFER, DIALECT_TABBYAPI, DIALECT_OMLX])
 
-/** Context window of the production 224K line (229376). */
-export const DEFAULT_CONTEXT_WINDOW = 229376
+/** Shared context window of the standard lines (256K; the ExLlamaV3 cache sizing). */
+export const DEFAULT_CONTEXT_WINDOW = 262144
 
-/** Output cap of the production line (229376 - 204800, the narrow-band floor). */
-export const DEFAULT_MAX_TOKENS = 24576
+/**
+ * Output cap ≈ 20% of the context window (0.2 × 262144): compaction triggers
+ * at 0.8 × contextWindow, leaving this headroom for the final response so a
+ * full-length answer never overruns the window.
+ */
+export const DEFAULT_MAX_TOKENS = 52428
 
 /**
  * TabbyAPI line defaults: the ExLlamaV3 server for Qwen3.8-Flash-Next 4.05bpw
- * EXL3 (256K context, the EXL3 cache allocation). The output cap keeps the
- * same narrow-band floor arithmetic (262144 - 204800).
+ * EXL3 (256K context, the EXL3 cache allocation). The output cap follows the
+ * same ~20%-of-window headroom rule as the other lines.
  */
 export const DEFAULT_TABBYAPI_BASE_URL = 'http://localhost:8083/v1'
 export const DEFAULT_TABBYAPI_MODEL = 'Qwen3.8-Flash-Next-4.05bpw'
 export const DEFAULT_TABBYAPI_CONTEXT_WINDOW = 262144
-export const DEFAULT_TABBYAPI_MAX_TOKENS = 57344
+export const DEFAULT_TABBYAPI_MAX_TOKENS = 52428
 
 /**
  * oMLX line defaults: the Apple Silicon MLX server for Qwen3.8-27B
