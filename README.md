@@ -4,6 +4,8 @@
 
 [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com/p/Yunado/dsh-qwen38-local-qol/) · [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/yunado/dsh-qwen38-local-qol) · [![License: MIT](https://img.shields.io/github/license/Yunado/dsh-qwen38-local-qol)](https://github.com/Yunado/dsh-qwen38-local-qol/blob/main/LICENSE)
 
+[![dsh.so risk](https://www.dsh.so/badge/dsh-qwen38-local-qol.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.6-alpha.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.6-alpha.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.5-rc.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.5-rc.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/)
+
 A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) for running **Qwen3.8 locally** (llama.cpp `llama-server`, NInfer, TabbyAPI — the ExLlamaV3 backend server, or oMLX — Apple Silicon MLX inference server; all serve the OpenAI-compatible `/v1` API; at the config level also **Qwen3.8-Flash-Next**). No core patches, no pi-ai patchfile.
 
 ## Install
