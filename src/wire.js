@@ -11,6 +11,8 @@
  * @module dsh-qwen38-local-qol/wire
  */
 
+import { DEFAULT_THINKING_BUDGETS } from './config.js'
+
 /** A message content block this adapter cannot represent on the wire. */
 export const UNSUPPORTED_CONTENT_CODE = 'UNSUPPORTED_CONTENT'
 
@@ -317,7 +319,15 @@ export function buildQwenBody(options, fallbackModel, config, imageDataUrls) {
   }
   body.chat_template_kwargs = kwargs
 
-  const budget = thinkingOn ? config.thinkingBudgets?.[effort] : undefined
+  // Per-level hard cap; when the selected level has no budget configured,
+  // fall back to the xhigh tier value so a thinking-on request is always
+  // capped (a missing per-level entry must not mean "think without a cap").
+  const budgets = config.thinkingBudgets
+  const budget = !thinkingOn
+    ? undefined
+    : typeof budgets?.[effort] === 'number'
+      ? budgets[effort]
+      : budgets?.xhigh ?? DEFAULT_THINKING_BUDGETS.xhigh
   if (typeof budget === 'number') body.reasoning_budget_tokens = budget
 
   return body

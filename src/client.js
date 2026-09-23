@@ -53,7 +53,7 @@ const COPY = {
     model: 'Model id',
     displayName: 'Display name',
     apiKey: 'API key',
-    apiKeyHint: 'Optional — empty keeps this line keyless. When set, requests to THIS line carry Authorization: Bearer <key>. Each line stores its own key.',
+    apiKeyHint: 'Empty = keyless. When set, requests carry Authorization: Bearer <key>.',
     revealKey: 'Reveal the stored key',
     concealKey: 'Conceal the stored key',
     window: 'Window and output',
@@ -93,7 +93,7 @@ const COPY = {
     model: '模型 id',
     displayName: '显示名',
     apiKey: '接口密钥（API key）',
-    apiKeyHint: '可选——留空 = 该线无认证；填写后该线请求附带 Authorization: Bearer <key>。每条线各存一份。',
+    apiKeyHint: '留空 = 无认证；填写后请求带 Authorization: Bearer <key>。',
     revealKey: '显示已存的密钥',
     concealKey: '隐藏已存的密钥',
     window: '窗口与输出',
@@ -172,13 +172,13 @@ function digitsOnly(setValue) {
 
 /**
  * The built-in window defaults per line, mirroring `resolveConfig`: every
- * 224K line (llama.cpp, NInfer) opens on 229376/24576; the ExLlamaV3 line
- * (TabbyAPI) opens on its 256K context and its narrow-band output cap.
+ * standard line opens on a 256K context with the ~20%-of-window output cap
+ * (headroom for the compaction trigger at 0.8× contextWindow).
  */
 const LINE_WINDOW_DEFAULTS = Object.freeze({
-  ninfer: { contextWindow: 229376, maxTokens: 24576 },
-  llamacpp: { contextWindow: 229376, maxTokens: 24576 },
-  tabbyapi: { contextWindow: 262144, maxTokens: 57344 },
+  ninfer: { contextWindow: 262144, maxTokens: 52428 },
+  llamacpp: { contextWindow: 262144, maxTokens: 52428 },
+  tabbyapi: { contextWindow: 262144, maxTokens: 52428 },
 })
 
 /**

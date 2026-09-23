@@ -153,8 +153,8 @@ test('client: a stale-revision write answers a conflict the caller can re-load',
 
 test('toDraft: a fresh section (no user layer) ships the production defaults pre-filled', () => {
   const draft = client.toDraft({ dialect: 'ninfer', baseURL: 'http://localhost:8082/v1', model: 'qwen3.8-27b-nvfp4' })
-  assert.equal(draft.contextWindow, '229376')
-  assert.equal(draft.maxTokens, '24576')
+  assert.equal(draft.contextWindow, '262144')
+  assert.equal(draft.maxTokens, '52428')
   assert.equal(draft.low, '4096')
   assert.equal(draft.medium, '8192')
   assert.equal(draft.xhigh, '16384')
@@ -169,10 +169,10 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   assert.equal(draft.apiKey, '')
   // The other lines park at their built-in defaults.
   assert.equal(draft.lines.llamacpp.baseURL, '')
-  assert.equal(draft.lines.llamacpp.contextWindow, '229376')
+  assert.equal(draft.lines.llamacpp.contextWindow, '262144')
   assert.equal(draft.lines.tabbyapi.baseURL, '')
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '57344')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
   assert.equal(draft.lines.ninfer.xhigh, '16384')
 })
 
@@ -218,7 +218,7 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   // The unpersisted TabbyAPI line parks at its built-in 256K defaults.
   assert.equal(draft.lines.tabbyapi.baseURL, '')
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '57344')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
 })
 
 test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {

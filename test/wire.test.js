@@ -124,10 +124,15 @@ test('buildQwenBody: compaction purpose keeps the line output cap over the engin
   assert.equal(normal.max_tokens, 24576)
 })
 
-test('buildQwenBody: effort without a configured budget sends no budget field', () => {
+test('buildQwenBody: effort without a configured per-level budget rides the xhigh tier value', () => {
+  // A partial budget map must not mean "think without a cap": the selected
+  // level without its own entry falls back to the xhigh tier value.
   const config = { ...NINFER, thinkingBudgets: { low: 4096 } }
   const body = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', config)
-  assert.ok(!('reasoning_budget_tokens' in body))
+  assert.equal(body.reasoning_budget_tokens, 16384)
+  // An entirely absent budgets map caps at the built-in xhigh value too.
+  const bare = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', { dialect: 'ninfer', includeUsage: false })
+  assert.equal(bare.reasoning_budget_tokens, 16384)
 })
 
 test('buildQwenBody: model falls back to the configured id', () => {

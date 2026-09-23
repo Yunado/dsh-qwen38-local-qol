@@ -62,8 +62,8 @@ export const BACKEND_ROW_ID = 'compaction-basic'
  * `./backend`.
  */
 export const BACKEND_PACKAGE = 'dsh-qwen38-local-qol/backend'
-/** The stock config value pinned on the backend row (8192 truncates long local checkpoints; 16384 proved tight on the 125B line). */
-export const BACKEND_MAX_TOKENS = 24576
+/** The config value pinned on the backend row: matches the plugin output cap (~20% of the 256K window); the stock 8192 truncates long local checkpoints. */
+export const BACKEND_MAX_TOKENS = 52428
 /** The user settings file at the DSH home root. */
 export const SETTINGS_FILE = 'settings.yaml'
 /** The settings section that carries the default agent preset. */

@@ -39,7 +39,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 |---|---|---|
 | Server | `baseURL`, `model`, `displayName`, `apiKey` (`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`) | `http://localhost:8080/v1`, `qwen3.8-27b`, same as `model`, none |
 | Dialect | `dialect` (`DSH_QWEN38_DIALECT`) | `llamacpp` (options: `ninfer`, `tabbyapi`) |
-| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `229376`, `24576` |
+| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `262144`, `52428` (output cap ≈ 20% of the window — headroom for the compaction trigger at 0.8×) |
 | Thinking | `thinkingBudgets` (llamacpp + tabbyapi, per effort), `defaultThinkingBudget` (ninfer, headless/env only — the tab shows the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 4096, medium: 8192, xhigh: 16384 }`, `16384`, `medium` |
 | Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` (env only) | `strip`, `5`, `2000` |
 
@@ -120,7 +120,7 @@ DSH 设置 → **Qwen3.8 本地**：
 |---|---|---|
 | 服务器 | `baseURL`、`model`、`displayName`、`apiKey`（`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`） | `http://localhost:8080/v1`、`qwen3.8-27b`、同 `model`、无 |
 | 方言 | `dialect`（`DSH_QWEN38_DIALECT`） | `llamacpp`（可选：`ninfer`、`tabbyapi`） |
-| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `229376`、`24576` |
+| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `262144`、`52428`（输出帽 ≈ 窗口的 20%，为 0.8× 压缩触发线留余量） |
 | Thinking | `thinkingBudgets`（llamacpp + tabbyapi，按 effort）、`defaultThinkingBudget`（ninfer，仅 headless/env——tab 显示启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 4096, medium: 8192, xhigh: 16384 }`、`16384`、`medium` |
 | Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`（仅环境变量） | `strip`、`5`、`2000` |
 

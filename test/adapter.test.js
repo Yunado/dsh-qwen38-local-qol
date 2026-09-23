@@ -11,8 +11,8 @@ const CONFIG = {
   model: 'qwen',
   apiKey: undefined,
   dialect: 'ninfer',
-  contextWindow: 229376,
-  maxTokens: 24576,
+  contextWindow: 262144,
+  maxTokens: 52428,
   thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 },
   thinkingLevelMap: {},
   includeUsage: false,
@@ -61,7 +61,7 @@ const options = () => ({
   provider: 'qwen38',
   model: 'qwen',
   reasoningEffort: 'medium',
-  maxTokens: 24576,
+  maxTokens: 52428,
   system: 'sys',
   messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
   signal: new AbortController().signal,
@@ -95,7 +95,7 @@ test('stream: reasoning + text + usage with reasoning tokens, terminal finish', 
   assert.equal(sent.reasoning_effort, 'medium')
   assert.deepEqual(sent.chat_template_kwargs, { enable_thinking: true })
   assert.equal(sent.reasoning_budget_tokens, 8192)
-  assert.equal(sent.max_tokens, 24576)
+  assert.equal(sent.max_tokens, 52428)
   assert.equal(sent.stream, true)
   assert.equal(sent.model, 'qwen')
   assert.deepEqual(sent.messages[0], { role: 'system', content: 'sys' })
@@ -357,8 +357,8 @@ test('resolveModel: context capacity and the effort vocabulary with budgets', as
   const info = await adapter.resolveModel('qwen38', 'qwen')
   assert.equal(info.provider, 'qwen38')
   assert.equal(info.id, 'qwen')
-  assert.deepEqual(info.context, { contextWindow: 229376 })
-  assert.equal(info.defaultMaxTokens, 24576)
+  assert.deepEqual(info.context, { contextWindow: 262144 })
+  assert.equal(info.defaultMaxTokens, 52428)
   assert.deepEqual(info.inputModalities, ['text', 'image'])
   const ids = info.reasoning.efforts.map((effort) => effort.id)
   assert.deepEqual(ids, ['off', 'low', 'medium', 'xhigh'])
