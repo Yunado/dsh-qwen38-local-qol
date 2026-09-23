@@ -1,6 +1,6 @@
 {
   "name": "dsh-qwen38-local-qol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DeepSeek Harness QoL plugin for the local Qwen3.8 line (27B, Flash-Next): per-request thinking budgets on llama.cpp, NInfer, TabbyAPI, and oMLX dialects, vision + tools, and a compaction backend whose summaries stop burning the output cap on thinking.",
   "type": "module",
   "license": "MIT",
