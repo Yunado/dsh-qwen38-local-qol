@@ -27,6 +27,8 @@ Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset fro
 
 DSH settings → **Qwen3.8 Local**:
 
+![server line selector — llama.cpp / NInfer / TabbyAPI / oMLX](<docs/qwen38 server-en.png>)
+
 ![the Qwen3.8 Local settings tab](<docs/qwen38 tab-en.png>)
 
 Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to `settings.yaml` (hot-reloaded).
@@ -143,6 +145,8 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 ## 设置 tab
 
 DSH 设置 → **Qwen3.8 本地**：
+
+![服务器线选择器——llama.cpp / NInfer / TabbyAPI / oMLX](<docs/qwen38 server-cn.png>)
 
 ![Qwen3.8 本地设置页](<docs/qwen38 tab-cn.png>)
 
