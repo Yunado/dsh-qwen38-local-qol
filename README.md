@@ -2,7 +2,7 @@
 
 [English](#dsh-qwen38-local-qol) · [中文](#中文)
 
-[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com/p/Yunado/dsh-qwen38-local-qol/) · [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/yunado/dsh-qwen38-local-qol) · [![License: MIT](https://img.shields.io/github/license/Yunado/dsh-qwen38-local-qol)](https://github.com/Yunado/dsh-qwen38-local-qol/blob/main/LICENSE)
+[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com/p/Yunado/dsh-qwen38-local-qol/) · [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/yunado/dsh-qwen38-local-qol) · [![dshfind](https://dshfind.com/api/badge/Yunado/dsh-qwen38-local-qol?lang=zh)](https://dshfind.com/zh/plugins/Yunado/dsh-qwen38-local-qol?ref=badge) · [![License: MIT](https://img.shields.io/github/license/Yunado/dsh-qwen38-local-qol)](https://github.com/Yunado/dsh-qwen38-local-qol/blob/main/LICENSE)
 
 [![dsh.so risk](https://www.dsh.so/badge/dsh-qwen38-local-qol.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.6-alpha.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.6-alpha.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.5-rc.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.5-rc.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/)
 
