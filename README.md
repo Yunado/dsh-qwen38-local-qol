@@ -16,15 +16,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset from the standard preset's composition, and sets it as the default agent preset when no default is configured. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-### Install a specific version
-
-The bare spec above tracks `main` (an `update` follows it). To pin an exact release instead:
-
-```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.2.0
-```
-
-Tags are immutable, so a pinned install never drifts on its own; `update` keeps you on the pinned tag. Change the `#tag` to move. History: [GitHub Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases).
+The bare spec tracks `main`; prefer an exact release instead? Pin the tag in the spec (`#v0.2.0` or any past release) and see [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for details.
 
 ![the generated qwen38 preset on the Agent presets page](<docs/qwen38 preset-en.png>)
 
@@ -144,15 +136,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 重启 `dsh web`：启动时插件从 standard preset 的组成生成 **`qwen38`** 用户 preset，且未配置默认时将其设为默认 agent preset。新会话自动使用；已有会话保留创建时的 preset。
 
-### 定点安装某个版本
-
-上面的裸引用跟 main 走（`update` 时跟到最新）。要钉住某个 release：
-
-```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.2.0
-```
-
-tag 不可变，钉住的引用不会自己漂移；`update` 也不会把你移开；升版 = 改 `#tag`。历史版本：[GitHub Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
+上面的裸引用跟 main 走；想钉某个具体 release？在 spec 里加 `#v0.2.0`（或任意历史 tag），详情见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
 
 ![生成的 qwen38 预设（Agent 预设页）](<docs/qwen38 preset-cn.png>)
 
