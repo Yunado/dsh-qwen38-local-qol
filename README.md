@@ -85,7 +85,6 @@ The settings tab keeps independent settings for each dialect (`llamacpp`, `omlx`
 
 ## Limitations
 
-- **Flash-Next has a fast line and a compat line**: the ExLlamaV3/TabbyAPI dialect (EXL3 quant, 256K context) is the fast path; the llama.cpp dialect still runs it at its own window/budget values.
 - **Vision token pricing on TabbyAPI / oMLX is not pinned**: token meters report image capacity as unknown on these lines until the backend image-processor formulas are calibrated (the request itself works; only the pre-flight capacity projection is affected).
 - **Multimodal tool messages are a newer wire form**: tool messages carrying resolved images are sent as a content array with `image_url` entries; each line's server must accept that form. A rejecting line answers with an HTTP error whose body the adapter surfaces verbatim (never a silent drop).
 - **Vision budget rejections self-heal**: an NInfer 400 `media_budget_exceeded` ("vision raw patches exceed processor budget") classifies as `CONTEXT_WINDOW_EXCEEDED`, so the harness's overflow recovery compacts history below the normal threshold and retries the step; only repeated budget failures (e.g. one image alone over the per-image cap) surface as an error.
@@ -204,7 +203,6 @@ DSH 设置 → **Qwen3.8 本地**：
 
 ## 已知限制
 
-- **Flash-Next 有快线与兼容线**：ExLlamaV3/TabbyAPI 方言（EXL3 量化、256K 上下文）是快线；llama.cpp 方言仍可按自己的窗口/预算值跑它。
 - **TabbyAPI / oMLX 线的视觉 token 数未钉**：这些线上 token meter 报图片容量未知（请求本身正常，只影响预检容量投影）。
 - **preset 接缝是 web 面功能**：headless profile 不挂 `agent-presets` 行；provider 路由（thinking 预算）两面都工作。
 - **摘要器内部行为依赖引擎版本**：wire 层规则（thinking off、完整输出帽）对所有引擎版本生效；引擎内部行为不在本插件控制之内。
