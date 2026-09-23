@@ -80,13 +80,15 @@ export const DEFAULT_TABBYAPI_CONTEXT_WINDOW = 262144
 export const DEFAULT_TABBYAPI_MAX_TOKENS = 52428
 
 /**
- * oMLX line defaults: the Apple Silicon MLX server for Qwen3.8-27B
- * (port 8000, 64K context window matching the 8bit profile and harness model settings).
+ * oMLX line defaults: the Apple Silicon MLX server for Qwen3.8-27B (port
+ * 8000). The window pair follows the shared standard-line defaults like
+ * every other line; adjust per machine (a Mac MLX profile may run a smaller
+ * context than 256K).
  */
 export const DEFAULT_OMLX_BASE_URL = 'http://localhost:8000/v1'
 export const DEFAULT_OMLX_MODEL = 'Qwen3.8-27B-MLX-8bit'
-export const DEFAULT_OMLX_CONTEXT_WINDOW = 64000
-export const DEFAULT_OMLX_MAX_TOKENS = 16384
+export const DEFAULT_OMLX_CONTEXT_WINDOW = 262144
+export const DEFAULT_OMLX_MAX_TOKENS = 52428
 
 /** Per-effort hard thinking budgets of the production line. */
 export const DEFAULT_THINKING_BUDGETS = Object.freeze({

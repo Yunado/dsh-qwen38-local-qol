@@ -183,7 +183,7 @@ const LINE_WINDOW_DEFAULTS = Object.freeze({
   ninfer: { contextWindow: 262144, maxTokens: 52428 },
   llamacpp: { contextWindow: 262144, maxTokens: 52428 },
   tabbyapi: { contextWindow: 262144, maxTokens: 52428 },
-  omlx: { contextWindow: 64000, maxTokens: 16384 },
+  omlx: { contextWindow: 262144, maxTokens: 52428 },
 })
 
 /**

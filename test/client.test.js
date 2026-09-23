@@ -174,8 +174,8 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
   assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
   assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '64000')
-  assert.equal(draft.lines.omlx.maxTokens, '16384')
+  assert.equal(draft.lines.omlx.contextWindow, '262144')
+  assert.equal(draft.lines.omlx.maxTokens, '52428')
   assert.equal(draft.lines.ninfer.xhigh, '16384')
 })
 
@@ -223,8 +223,8 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
   assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
   assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '64000')
-  assert.equal(draft.lines.omlx.maxTokens, '16384')
+  assert.equal(draft.lines.omlx.contextWindow, '262144')
+  assert.equal(draft.lines.omlx.maxTokens, '52428')
 })
 
 test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {

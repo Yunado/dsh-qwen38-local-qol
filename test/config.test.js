@@ -83,13 +83,13 @@ test('resolveConfig: the tabbyapi line opens on its own defaults', () => {
   assert.equal(resolved.maxTokens, 52428)
 })
 
-test('resolveConfig: the omlx line opens on its own defaults and supports OMLX_API_KEY', () => {
+test('resolveConfig: the omlx line opens on its own endpoint with shared window defaults, and supports OMLX_API_KEY', () => {
   const resolved = resolveConfig({ dialect: 'omlx' }, {})
   assert.equal(resolved.dialect, 'omlx')
   assert.equal(resolved.baseURL, 'http://localhost:8000/v1')
   assert.equal(resolved.model, 'Qwen3.8-27B-MLX-8bit')
-  assert.equal(resolved.contextWindow, 64000)
-  assert.equal(resolved.maxTokens, 16384)
+  assert.equal(resolved.contextWindow, 262144)
+  assert.equal(resolved.maxTokens, 52428)
 
   const withKey = resolveConfig({ dialect: 'omlx' }, { OMLX_API_KEY: 'sk-test-key' })
   assert.equal(withKey.apiKey, 'sk-test-key')
