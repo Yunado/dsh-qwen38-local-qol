@@ -1,8 +1,8 @@
 # dsh-qwen38-local-qol — 设计稿
 
 > 一个 DSH 插件，让 **stock dsh（零核心补丁、零 pi-ai patchfile）** 跑好本地
-> Qwen3.8 线（27B + Flash-Next；llama-server / NInfer）：逐请求 thinking 预算
-> + 长会话 compaction 不再被 thinking 吃满帽子。
+> Qwen3.8 线（27B + Flash-Next；四服务器线：llama-server / NInfer / TabbyAPI / oMLX）：
+> 逐请求 thinking 预算 + 长会话 compaction 不再被 thinking 吃满帽子。
 >
 > 内容来源 = 现网验证过的两条补丁链（compaction 9-file + reasoning 13-file），
 > 从"每版 dsh 重切核心 diff"改造成"依赖公共缝的插件"。
@@ -15,9 +15,9 @@ Flash-Next 也好用 → 家族级命名，不锁尺寸；"qol" = 定位诚实�
 
 - 仓库：`Yunado/dsh-qwen38-local-qol`（单包）
 - tagline: "Local Qwen3.8 line for DeepSeek Harness — per-request thinking
-  budgets + compaction that survives long thinking sessions. Built for the
-  Qwen3.8-27B line (llama.cpp + NInfer); Qwen3.8-Flash-Next runs on the same
-  llama.cpp dialect (user-verified)."
+  budgets + compaction that survives long thinking sessions. Four server lines
+  (llama.cpp / NInfer / TabbyAPI / oMLX); Qwen3.8-Flash-Next runs on the same
+  llama.cpp / TabbyAPI dialects (user-verified)."
 
 ### 家族兼容（Qwen3.8-Flash-Next，2026-08-26 发布）
 
@@ -30,7 +30,7 @@ Flash-Next = 超稀疏 MoE（125B 主模型 + 51B n-gram embedding，6B active/t
 | effort 方言 | Qwen3.8 家族模板统一支持 `reasoning_effort`/`enable_thinking`（家族默认 xhigh = 过度思考问题本身） |
 | thinking budget | 服务端执行（llama `--reasoning-budget` / vLLM 机制）；服务端不支持则优雅降级（发送不报错） |
 | compaction 半区 | summarizer 层行为，模型/架构无关 |
-| NInfer | 暂无 Flash-Next 工件（0.5.0 只有 27B NVFP4）→ 现仅 llama/vLLM 线 |
+| NInfer | 暂无 Flash-Next 工件（0.5.0 只有 27B NVFP4）；Flash-Next 走 **TabbyAPI 线**（exllamav3，用户生产线验证）/ llama.cpp 线 |
 
 ## 2. 架构：一个包，两个 registration（都是 effects）
 
@@ -39,7 +39,7 @@ DSH 插件契约（cookbook `adding-a-package.md`）：plugin = `name/inject/app
 
 | 半区 | 缝 | 做法 |
 |---|---|---|
-| A：reasoning/effort | `ctx.llm.registerAdapter(['qwen38'], adapter)`（dsh-llamacpp 同款缝） | 自研 provider adapter：双方言 wire + 逐请求 thinking budget + vision + tools + reasoning_tokens usage。**不走 pi-ai**（pi-ai 补丁是 build-time 的，插件够不着） |
+| A：reasoning/effort | `ctx.llm.registerAdapter(['qwen38'], adapter)`（dsh-llamacpp 同款缝） | 自研 provider adapter：多方言 wire（llama.cpp / NInfer / TabbyAPI / oMLX，§5）+ 逐请求 thinking budget + vision + tools + reasoning_tokens usage。**不走 pi-ai**（pi-ai 补丁是 build-time 的，插件够不着） |
 | B：compaction | compaction backend 缝（docs/subsystems/compaction.md："a tokenizer- or template-based backend is a sibling package implementing the same interface"；`summarize()` = sole subclass hook） | **subclass compaction-basic backend**，override `summarize(input, owner, abort)`：reasoning-off 派发 + 三裁剪（剥图 / 近 5 轮 reasoning / tool 结果 2000 字——逻辑从现有补丁原样搬），复用导出的 `frameSummary` / `summarizeWithLlm` 保住 warm-prefix 缓存重放 |
 
 ### 挂载（M0 判定后定稿——web profile 的 compaction 活体在 per-session preset，profile patch 够不着）
@@ -61,10 +61,14 @@ profile（其 tui profile）有效。
         baseURL: http://localhost:8082/v1
         model: qwen3.8-27b-nvfp4
         dialect: ninfer
-        contextWindow: 229376
-        maxTokens: 24576
-        thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }
+        contextWindow: 262144
+        maxTokens: 52428
+        thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }   # 漏配档位回退 xhigh 值（thinking 开的请求永远带帽）
 ```
+
+四线窗口默认统一 `{262144, 52428}`（输出帽 = ~20% 窗口余量，为 0.8× 压缩触发线
+留头；client `LINE_WINDOW_DEFAULTS` 与 `DEFAULT_*` 常量同源）。其余三线同形状，
+仅 endpoint/model/dialect 不同。
 
 ```yaml
 # compaction backend 行 → 用户 preset 缝（~/.dsh/.agent-presets/qwen38/agent.cordis.yml）
@@ -114,10 +118,10 @@ profile（其 tui profile）有效。
 | `baseURL` | string | `http://localhost:8082/v1` | 含 `/v1`，不重复拼 |
 | `model` | string | 必填 | 服务端 alias |
 | `apiKey` | string | 无（不发 Authorization） | 或服务端 `--api-key` 同值 |
-| `dialect` | `'ninfer' \| 'llamacpp'` | 必填 | 决定 effort/budget 的 wire 位置（见 §5） |
+| `dialect` | `'ninfer' \| 'llamacpp' \| 'tabbyapi' \| 'omlx'` | 必填 | 决定 effort/budget 的 wire 位置（见 §5） |
 | `contextWindow` | int | 必填 | 透传给 harness 路由 |
 | `maxTokens` | int | 必填 | 映射 `max_tokens`（llama-server 不读 `max_completion_tokens`） |
-| `thinkingBudgets` | `{low, medium, xhigh}` | `{4096, 8192, 16384}` | 逐请求 `reasoning_budget_tokens`（llama 线，需服务端带 `--reasoning-budget` 补丁/消息）；NInfer 线发送但由服务端 `--default-thinking-budget` 封顶 |
+| `thinkingBudgets` | `{low, medium, xhigh}` | `{4096, 8192, 16384}` | 逐请求预算，wire 字段名按方言分道（§5：llama `reasoning_budget_tokens`（需服务端带 `--reasoning-budget` 补丁/消息）/ NInfer 发送但由服务端 `--default-thinking-budget` 封顶 / TabbyAPI 原生接受 / oMLX 顶层 `thinking_budget`）；漏配档位回退 xhigh 值——thinking 开的请求永远带硬帽 |
 | `vision` | bool | `true` | 图片块 → `image_url`（data URL） |
 
 ### Compaction `qwen38-compaction`
@@ -147,26 +151,25 @@ finish_reason 映射：`stop`→stop、`tool_calls`→tool-calls、`length`→**
 ## 6. 文件布局
 
 ```
-dsh-qwen38-local-qol/
-  package.json        # dsh.bundle.patch + peers(0.1.1-rc.2) + node --test
-  cordis.patch.yml    # §3 挂载
+dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，无 TS）
+  package.json        # dsh.bundle.patch + client.inject(locale) + peers(^0.1.1-rc.2) + node --test
+  cordis.patch.yml    # §3 挂载（provider 行）
   src/
-    index.ts          # plugin：name/inject/apply/Config；两个 effect 注册
-    provider/
-      adapter.ts      # qwen38 LlmAdapter（stream 解析 + 映射）
-      dialect.ts      # 双方言请求构建（§5 表）
-      errors.ts       # LlmError code 表
-    compaction/
-      backend.ts      # Qwen38CompactionBackend extends basic（override summarize）
-      trim.ts         # 三裁剪（从现有补丁 prepareMessagesForSummary 原样搬）
-    config.ts         # 两半区 zod/schemastery schema
-  test/
-    dialect.test.js   # 双方言请求构建快照
-    stream.test.js    # mock OpenAI server（node:http）：流/usage/finish/错误表
-    compaction.test.js# trim + reasoning-off + frameSummary 复用
-    bundle.test.js    # cordis.patch.yml 语法/挂载行
-  build.mjs           # esbuild src→lib（单命令，无 pnpm 依赖）
-  README.md           # 安装/配置/验证/与 dsh-llamacpp 与 dsh-dcp 的差异
+    index.js          # plugin：name/inject/apply/Config；adapter + settings 两个 effect
+    adapter.js        # qwen38 LlmAdapter（stream 解析 + usage 映射 + imageRequestPricing）
+    wire.js           # 四方言请求构建（§5 表）+ budget 回退/字段分道
+    backend.js        # Qwen38CompactionBackend extends compaction-basic（override summarize）
+    prepare.js        # summarize 前三裁剪（剥图 / 近 5 轮 reasoning / tool 结果 2000 字帽）
+    config.js         # 两半区 schemastery schema + DEFAULT_* 常量
+    setup.js          # boot 自动 setup：qwen38 preset 生成 + default 合并（--src 可选）
+    settings-section.js # settings ns 注册（schema/entry/validate，跨字段 fail-loud）
+    client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + summarize 开关）
+    client-entry.js / client.css  # client 半区入口 + 样式
+  lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行——改 src/client.js 后 scripts/build-client.mjs 重建并提交）
+  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（133 用例）
+  docs/               # 六图（server/tab/preset × en/cn）
+  README.md           # 中英双语：安装/四线/wire 说明/验证
+  DESIGN.md           # 本稿
   LICENSE             # MIT
 ```
 
@@ -230,3 +233,24 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 无 settings provider（headless）时行为与 M5 完全一致。测试：settings-section 12
 （schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
 下一 wire body 变）= 76/76。
+
+## 12. 发布态（release，main @ 4cd6f15；M0–M6 全部落地后的现状注记）
+
+- **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；窗口默认
+  统一 `{262144, 52428}`；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
+- **boot 自动 setup**：`dsh plugin add` + 重启即生成 **qwen38** preset（standard
+  组成重派生）+ `default: qwen38` 合并（显式默认不动）+ preset.yml 元数据按 locale
+  重渲染（zh/en 标量）；手动 = `setup.js [--src <preset>]`。GUI 选 qwen38 preset。
+- **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
+  apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
+  值；热加载免重启；zh/en 双语。suite = 133 用例全绿。
+- **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
+  llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024——
+  NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
+- **公开露出**：discussion 3465 评论锚点 + plugin showcase #5390 活帖（release 内容
+  + 徽章行 + awesome-dsh-plugin 深链）+ README 双徽章矩阵（awesome/dsh-plugin.org/
+  MIT + dsh.so risk&install×2）+ topics 五件（dsh-plugin/deepseek-harness/qwen/
+  llama-cpp/local-llm）。
+- **遗留**（与 §10 一致）：GUI 内置 effort picker 不显示插件线（composer 无选项，
+  配置默认值兜底）；TabbyAPI/oMLX 线 vision token 计价未钉（请求正常，仅预检容量
+  投影缺失）；preset 缝 web-surface only（headless profile 仍走 core patch 路线）。
