@@ -16,7 +16,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset from the standard preset's composition, and sets it as the default agent preset when no default is configured. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-The bare spec tracks `main`; prefer an exact release instead? Pin the tag in the spec (`#v0.2.0` or any past release) and see [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for details.
+You can also pin a specific release: add a tag to the spec (`#v0.2.0` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it.
 
 ![the generated qwen38 preset on the Agent presets page](<docs/qwen38 preset-en.png>)
 
@@ -136,7 +136,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 重启 `dsh web`：启动时插件从 standard preset 的组成生成 **`qwen38`** 用户 preset，且未配置默认时将其设为默认 agent preset。新会话自动使用；已有会话保留创建时的 preset。
 
-上面的裸引用跟 main 走；想钉某个具体 release？在 spec 里加 `#v0.2.0`（或任意历史 tag），详情见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.2.0` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
 
 ![生成的 qwen38 预设（Agent 预设页）](<docs/qwen38 preset-cn.png>)
 
