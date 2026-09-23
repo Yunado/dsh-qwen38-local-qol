@@ -1,4 +1,4 @@
-# dsh-qwen38-local-qol — 设计稿
+# dsh-qwen38-local-qol 设计稿
 
 > 一个 DSH 插件，让 **stock dsh（零核心补丁、零 pi-ai patchfile）** 跑好本地
 > Qwen3.8 线（27B + Flash-Next；四服务器线：llama-server / NInfer / TabbyAPI / oMLX）：
@@ -14,7 +14,7 @@ Flash-Next 也好用 → 家族级命名，不锁尺寸；"qol" = 定位诚实�
 生活质量层，不抢 dsh-dcp（确定性压缩）/ dsh-llamacpp（text-only adapter）生态位）。
 
 - 仓库：`Yunado/dsh-qwen38-local-qol`（单包）
-- tagline: "Local Qwen3.8 line for DeepSeek Harness — per-request thinking
+- tagline: "Local Qwen3.8 line for DeepSeek Harness: per-request thinking
   budgets + compaction that survives long thinking sessions. Four server lines
   (llama.cpp / NInfer / TabbyAPI / oMLX); Qwen3.8-Flash-Next runs on the same
   llama.cpp / TabbyAPI dialects (user-verified)."
@@ -26,7 +26,7 @@ Flash-Next = 超稀疏 MoE（125B 主模型 + 51B n-gram embedding，6B active/t
 
 | 维度 | Flash-Next |
 |---|---|
-| server 路由 | llama.cpp（Unsloth `qwen4exp` 分支）/ vLLM / SGLang——全是 OpenAI 兼容 `/v1/chat/completions`，adapter 同 wire，改 `baseURL`/`model` |
+| server 路由 | llama.cpp（Unsloth `qwen4exp` 分支）/ vLLM / SGLang，全是 OpenAI 兼容 `/v1/chat/completions`，adapter 同 wire，改 `baseURL`/`model` |
 | effort 方言 | Qwen3.8 家族模板统一支持 `reasoning_effort`/`enable_thinking`（家族默认 xhigh = 过度思考问题本身） |
 | thinking budget | 服务端执行（llama `--reasoning-budget` / vLLM 机制）；服务端不支持则优雅降级（发送不报错） |
 | compaction 半区 | summarizer 层行为，模型/架构无关 |
@@ -40,9 +40,9 @@ DSH 插件契约（cookbook `adding-a-package.md`）：plugin = `name/inject/app
 | 半区 | 缝 | 做法 |
 |---|---|---|
 | A：reasoning/effort | `ctx.llm.registerAdapter(['qwen38'], adapter)`（dsh-llamacpp 同款缝） | 自研 provider adapter：多方言 wire（llama.cpp / NInfer / TabbyAPI / oMLX，§5）+ 逐请求 thinking budget + vision + tools + reasoning_tokens usage。**不走 pi-ai**（pi-ai 补丁是 build-time 的，插件够不着） |
-| B：compaction | compaction backend 缝（docs/subsystems/compaction.md："a tokenizer- or template-based backend is a sibling package implementing the same interface"；`summarize()` = sole subclass hook） | **subclass compaction-basic backend**，override `summarize(input, owner, abort)`：reasoning-off 派发 + 三裁剪（剥图 / 近 5 轮 reasoning / tool 结果 2000 字——逻辑从现有补丁原样搬），复用导出的 `frameSummary` / `summarizeWithLlm` 保住 warm-prefix 缓存重放 |
+| B：compaction | compaction backend 缝（docs/subsystems/compaction.md："a tokenizer- or template-based backend is a sibling package implementing the same interface"；`summarize()` = sole subclass hook） | **subclass compaction-basic backend**，override `summarize(input, owner, abort)`：reasoning-off 派发 + 三裁剪（剥图 / 近 5 轮 reasoning / tool 结果 2000 字，逻辑从现有补丁原样搬），复用导出的 `frameSummary` / `summarizeWithLlm` 保住 warm-prefix 缓存重放 |
 
-### 挂载（M0 判定后定稿——web profile 的 compaction 活体在 per-session preset，profile patch 够不着）
+### 挂载（M0 判定后定稿。web profile 的 compaction 活体在 per-session preset，profile patch 够不着）
 
 **M0 证据**（dump + 源码）：web profile root 层的 compaction 行（compaction-basic /
 command-compact / tool-result-pruner）全被 dsh-web-app 补丁 `disabled: true`；
@@ -105,7 +105,7 @@ profile（其 tui profile）有效。
 |---|---|
 | `summarize()` subclass hook | rc.2（b150a551b8）**与** alpha.3 都有：`protected async summarize(` + "sole subclass customization hook"；`summarizer.ts` 导出 `SummarizationInput` / `SummaryResult` / `summarizeWithLlm` / `frameSummary` |
 | compaction 挂载语法 | fan56/dsh-dcp `cordis.patch.yml`：`- id: compaction-basic, disabled: true` + `- insert: - id: dsh-dcp, name: '@aiwayds/dsh-dcp'`；README："挂在 dsh 的压缩接口上，只替换'摘要'这一环，继承官方触发/保留/锁/tool-pairing"，65 测试 |
-| provider adapter 缝 | jwilson411/dsh-llamacpp：`ctx.llm.registerAdapter(['llamacpp'], adapter)`；`LlmAdapter`/`LlmError`/`attributionHeaders`/`errorChain` 来自 `@deepseek-ai/dsh-llm`；text-only（vision/tool 块显式拒）——我们要做的正是它没做的部分 |
+| provider adapter 缝 | jwilson411/dsh-llamacpp：`ctx.llm.registerAdapter(['llamacpp'], adapter)`；`LlmAdapter`/`LlmError`/`attributionHeaders`/`errorChain` 来自 `@deepseek-ai/dsh-llm`；text-only（vision/tool 块显式拒）；我们要做的正是它没做的部分 |
 | 外部插件包结构 | 两个样板一致：`package.json`（type module、`dsh.bundle.patch`、peer+dev 双列 dsh 依赖、`overrides` 钉版、`node --test`）+ `cordis.patch.yml` + `lib/`（dsh-dcp）或 `src/`（dsh-llamacpp）+ README + LICENSE(MIT) |
 | token meter 图像计价缝 | alpha.3 `LlmRuntime.imageRequestPricing`（packages/llm/llm/src/index.ts L659-660）对注册 adapter **无守卫调用** `adapter.imageRequestPricing(provider, model)`；rc.2 `LlmAdapter` 基类**没有**该方法 → rc.2 系 adapter 在 alpha.3 树下 `tokenMeter.measure()` 抛 `not a function`，被 compaction pre-step 的 catch 吞掉（`TargetPressureConfigError` 之外的错误只 warn 后继续）→ **压力压缩静默永不触发**（2026-09 长会话真机实测坐实，已补 adapter 实现） |
 
@@ -121,7 +121,7 @@ profile（其 tui profile）有效。
 | `dialect` | `'ninfer' \| 'llamacpp' \| 'tabbyapi' \| 'omlx'` | 必填 | 决定 effort/budget 的 wire 位置（见 §5） |
 | `contextWindow` | int | 必填 | 透传给 harness 路由 |
 | `maxTokens` | int | 必填 | 映射 `max_tokens`（llama-server 不读 `max_completion_tokens`） |
-| `thinkingBudgets` | `{low, medium, xhigh}` | `{4096, 8192, 16384}` | 逐请求预算，wire 字段名按方言分道（§5：llama `reasoning_budget_tokens`（需服务端带 `--reasoning-budget` 补丁/消息）/ NInfer 发送但由服务端 `--default-thinking-budget` 封顶 / TabbyAPI 原生接受 / oMLX 顶层 `thinking_budget`）；漏配档位回退 xhigh 值——thinking 开的请求永远带硬帽 |
+| `thinkingBudgets` | `{low, medium, xhigh}` | `{4096, 8192, 16384}` | 逐请求预算，wire 字段名按方言分道（§5：llama `reasoning_budget_tokens`（需服务端带 `--reasoning-budget` 补丁/消息）/ NInfer 发送但由服务端 `--default-thinking-budget` 封顶 / TabbyAPI 原生接受 / oMLX 顶层 `thinking_budget`）；漏配档位回退 xhigh 值，thinking 开的请求永远带硬帽 |
 | `vision` | bool | `true` | 图片块 → `image_url`（data URL） |
 
 ### Compaction `qwen38-compaction`
@@ -165,7 +165,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
     settings-section.js # settings ns 注册（schema/entry/validate，跨字段 fail-loud）
     client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + summarize 开关）
     client-entry.js / client.css  # client 半区入口 + 样式
-  lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行——改 src/client.js 后 scripts/build-client.mjs 重建并提交）
+  lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行；改 src/client.js 后 scripts/build-client.mjs 重建并提交）
   test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（133 用例）
   docs/               # 六图（server/tab/preset × en/cn）
   README.md           # 中英双语：安装/四线/wire 说明/验证
@@ -195,7 +195,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
 
 | M | 内容 | 出口 |
 |---|---|---|
-| M0 | 缝验证 spike：① preset isolated compaction group 的 patch 语义（`id: compaction-basic` 行是否同时命中 isolated 组实例——Vali-D 8192 坑）② alpha.3 profile 装 rc.2-钉定插件的兼容性 | 结论 + 必要时挂载语法调整 |
+| M0 | 缝验证 spike：① preset isolated compaction group 的 patch 语义（`id: compaction-basic` 行是否同时命中 isolated 组实例，Vali-D 8192 坑）② alpha.3 profile 装 rc.2-钉定插件的兼容性 | 结论 + 必要时挂载语法调整 |
 | M1 | provider MVP：text + 双方言 effort/budget + 错误表 + 测试 | 真机 NInfer 一轮对话 |
 | M2 | vision + tools round-trip + usage.reasoning_tokens + 测试补齐 | 真机带图 + 带工具轮 |
 | M3 | compaction subclass + 挂载 + 测试 | 真机 /compact 手动触发成功 |
@@ -212,11 +212,11 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
 4. dsh-dcp 生态位重叠：它是"零 LLM 确定性压缩"（不同卖点），我们在 README
    写明差异（我们要语义摘要 + 本地 thinking 模型场景）。
 5. llama 线 `reasoning_tokens` usage 依赖 llama.cpp 服务端补丁（我们的 7 文件
-   补丁）——无补丁时 usage 缺字段，插件容错（不报错，GUI 无逐轮 thinking 数）。
+   补丁）。无补丁时 usage 缺字段，插件容错（不报错，GUI 无逐轮 thinking 数）。
 
 ## 11. M6：设置 tab（配置全进 UI，2026-09）
 
-用户诉求：设置里新一个 tab——**选 llama or ninfer** + 全参数表单（effort 预算 =
+用户诉求：设置里新一个 tab：**选 llama or ninfer** + 全参数表单（effort 预算 =
 "reasoning effort 单独的 cap" + compaction 旋钮 + baseURL/model 等）。参考
 样板 = dsh-ads（外部插件 client 半区 + settings.section 槽）。源码验证后的缝：
 
@@ -224,7 +224,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
 |---|---|---|
 | 宿主 | `SettingsProvider.installSection(owner, ns, schema, entry, {setSource, onChange, validate?})`（settings/src/index.ts L472，llm-pi-ai L296-310 同款惯用法） | `apply()` 内 `ctx.inject` 后注册 ns `qwen38-local-qol`；schema = schemastery 对象（字段名与 `resolveConfig` 输出一一对应，默认值镜像生产线；partial 自动填默认、未知键透传、错类型拒）；entry/base = **全量 resolved 行**（detach fallback 原样使用，必须含全字段）；跨字段校验（dialect / defaultEffort∈off+预算键 / summarize 旋钮）走 `validate`，写入时 fail-loud |
 | 宿主 | adapter / compaction 活读 | `QwenLocalAdapter` 构造收**配置源 thunk**（`#config` 变 private getter，6 个读取点零改动）；`QwenLocalCompaction.summarize` 每次调用 `this.ctx.get('settings').get(NS)` 活读 `summarize` 块（无 ns 时落 env 链）。**不重注册**（route id 永不变，比 pi-ai 的动态重注册路径简单）→ 保存即下一请求生效，无需重启 |
-| 浏览器 | `settings.section` 槽（ui-settings contract：owner 只给 `close`，数据自携） | `./client` 导出（raw ESM 无 JSX，settings.section 槽 + dsh.client manifest 自动发现，**不需要 web-app cordis 行**）；locale 注入 hook（zh/en 双字典，label 随 locale 重注册）。**bundle 格式坑（2026-09 真机坐实）**：web loader（client/modules Node 半区）把 `./client` 文件的**字节原样当 classic script 执行**，靠文件自己调 `window.__ModuleLoader__.load({ id, factory: require => {...} })` 注册——顶层 `import`/`export` 是 syntax error（dsh-ads 的 tsdown clientBundle 就是此格式）→ 我们的 raw ESM 必须经 esbuild（CJS、react external）+ load() 包装成 `lib/client.js`（scripts/build-client.mjs，产物提交，改 src/client.js 后 `pnpm run build:client`） |
+| 浏览器 | `settings.section` 槽（ui-settings contract：owner 只给 `close`，数据自携） | `./client` 导出（raw ESM 无 JSX，settings.section 槽 + dsh.client manifest 自动发现，**不需要 web-app cordis 行**）；locale 注入 hook（zh/en 双字典，label 随 locale 重注册）。**bundle 格式坑（2026-09 真机坐实）**：web loader（client/modules Node 半区）把 `./client` 文件的**字节原样当 classic script 执行**，靠文件自己调 `window.__ModuleLoader__.load({ id, factory: require => {...} })` 注册；顶层 `import`/`export` 是 syntax error（dsh-ads 的 tsdown clientBundle 就是此格式）→ 我们的 raw ESM 必须经 esbuild（CJS、react external）+ load() 包装成 `lib/client.js`（scripts/build-client.mjs，产物提交，改 src/client.js 后 `pnpm run build:client`） |
 | 浏览器 | 读写 | `ctx.remote.settings.describe()` 读 ns view（value+revision）；`update(ns, patch, revision)` 乐观写（响应 = 新 view，fold 回本地）；`settings/conflict` → 重新 describe + 提示；页内展示 revision |
 
 schema 字段 = 配置表全量（dialect/baseURL/model/displayName/apiKey/contextWindow/
@@ -234,7 +234,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 （schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
 下一 wire body 变）= 76/76。
 
-## 12. 发布态（release，main @ 4cd6f15；M0–M6 全部落地后的现状注记）
+## 12. 发布态（release，main @ 4cd6f15；M0-M6 全部落地后的现状注记）
 
 - **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；窗口默认
   统一 `{262144, 52428}`；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
@@ -245,7 +245,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
   值；热加载免重启；zh/en 双语。suite = 133 用例全绿。
 - **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
-  llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024——
+  llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024，
   NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
 - **公开露出**：discussion 3465 评论锚点 + plugin showcase #5390 活帖（release 内容
   + 徽章行 + awesome-dsh-plugin 深链）+ README 双徽章矩阵（awesome/dsh-plugin.org/
