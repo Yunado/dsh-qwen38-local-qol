@@ -80,7 +80,7 @@ const COPY = {
     invalidNumber: 'Every number field must be a positive whole number.',
     compactTrigger: 'Compaction trigger',
     compactTriggerHint: 'Automatic compaction fires at window × this ratio; the slider caps where the line output reservation leaves room (currently {cap}%). Current usage lives in the chat page meter.',
-    invalidPct: 'Trigger percent must be a whole number 17..99.',
+    invalidPct: 'Trigger percent must be a whole number 50..99.',
     remoteError: 'Settings request failed: ',
     compactionNotSet: 'The qwen38 preset is not declared by the installed plugin bundle (reinstall or update the plugin, then restart dsh web).',
     compactionActive: 'Local compaction is active for new sessions (default preset: qwen38).',
@@ -125,7 +125,7 @@ const COPY = {
     invalidNumber: '所有数字字段必须是正整数。',
     compactTrigger: '压缩触发点',
     compactTriggerHint: '自动压缩在 窗口 × 该比例 处触发；滑块上限已按输出上限预留（当前上限 {cap}%）。当前用量看聊天页顶部的上下文计量。',
-    invalidPct: '触发比例必须是 17 到 99 的整数。',
+    invalidPct: '触发比例必须是 50 到 99 的整数。',
     remoteError: '设置请求失败：',
     compactionNotSet: 'qwen38 预设未由已安装的插件 bundle 声明（重装或更新插件后重启 dsh web）。',
     compactionActive: '本地压缩对新会话生效（默认预设：qwen38）。',
@@ -358,7 +358,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       return
     }
     const compactPct = Number.parseInt(draft.compactPct, 10)
-    if (!Number.isInteger(compactPct) || compactPct < 17 || compactPct > 99) {
+    if (!Number.isInteger(compactPct) || compactPct < 50 || compactPct > 99) {
       setState((s) => ({ ...s, error: t.invalidPct }))
       return
     }
@@ -468,10 +468,10 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const windowTokens = /^\d+$/.test(draft.contextWindow) ? Number.parseInt(draft.contextWindow, 10) : 0
   const outputTokens = /^\d+$/.test(draft.maxTokens) ? Number.parseInt(draft.maxTokens, 10) : 0
   const triggerCapPct = windowTokens > 0 && outputTokens > 0 && outputTokens < windowTokens
-    ? Math.max(17, Math.min(99, Math.floor(((windowTokens - outputTokens) * 100) / windowTokens)))
+    ? Math.max(50, Math.min(99, Math.floor(((windowTokens - outputTokens) * 100) / windowTokens)))
     : 99
   const compactPctDraft = /^\d+$/.test(draft.compactPct) ? Number.parseInt(draft.compactPct, 10) : 80
-  const compactPctClamped = Math.min(Math.max(17, compactPctDraft), triggerCapPct)
+  const compactPctClamped = Math.min(Math.max(50, compactPctDraft), triggerCapPct)
   const triggerTokens = Math.round((windowTokens * compactPctClamped) / 100)
   return React.createElement('div', { className: 'qol' },
     React.createElement('h2', { className: 'qol-title' }, t.title),
@@ -569,7 +569,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         React.createElement('input', {
           className: 'qol-slider',
           type: 'range',
-          min: 17,
+          min: 50,
           max: triggerCapPct,
           step: 1,
           value: compactPctClamped,

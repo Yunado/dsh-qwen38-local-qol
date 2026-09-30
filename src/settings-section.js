@@ -46,6 +46,27 @@ import { DEFAULT_TRIM_KNOBS } from './prepare.js'
 /** The settings namespace this plugin owned pre-0.2.0 (kept for status text and tests). */
 export const NS = 'qwen38-local-qol'
 
+/**
+ * The plugin row's live config reference, published by the entry fiber.
+ *
+ * Why a module mirror: the compaction backend is mounted in a preset fiber,
+ * not this row's fiber, and the 0.2.0 host's `settings` service exposes only
+ * describe/update/mutate (the pre-0.2.0 `settings.get(ns)` seam is gone) under
+ * namespaces that are profile entry ids, not this module's NS. So the backend
+ * cannot reach this row's live section through the context; the entry fiber's
+ * own live config reference is the only route to `compactThresholdPct` and the
+ * `summarize` knobs. It is stored still wrapped: readers resolve each volatile
+ * leaf per read, so a hot commit is visible without republishing. One plugin
+ * row per process; a fiber's disposal clears only its own reference.
+ */
+let liveConfig = undefined
+
+/** Publish this row's live config reference (undefined clears the mirror). */
+export function publishLiveConfig(config) { liveConfig = config }
+
+/** The live config reference, or undefined when no row is mounted. */
+export function liveConfigView() { return liveConfig }
+
 /** Identity modifier for the plain schema variant. */
 const plain = (schema) => schema
 /** Volatile modifier: the leaf is hot-editable (no remount) in 0.2.0 hosts. */
@@ -133,9 +154,11 @@ function buildSchema(mark) {
     // Where automatic pressure compaction fires, as a percent of the active
     // line's context window: the compaction backend reads it at every trigger
     // evaluation and feeds the engine's thresholdRatio (hot, no restart). The
-    // floor 17 keeps the stock retainRatio 0.16 strictly below the threshold;
-    // the ceiling 99 leaves the line's own output reservation to cap the
-    // effective point (the engine takes `min(window x ratio, window - output)`).
+    // floor 50: below that the fixed overhead (system prompt + tool
+    // definitions) plus the checkpoint floor would leave compaction cycles
+    // almost nothing to free; the ceiling 99 leaves the line's own output
+    // reservation to cap the effective point (the engine takes
+    // `min(window x ratio, window - output)`).
     compactThresholdPct: mark(Schema.number()).default(80),
     // The compaction wiring status rode the pre-0.2.0 section base (the tab
     // rendered it); the 0.2.0 Config does not carry status fields - the
@@ -235,8 +258,8 @@ export function validateSection(value) {
   // park junk the old tab would render.
   if (value.compactThresholdPct !== undefined
     && (!Number.isInteger(value.compactThresholdPct)
-      || value.compactThresholdPct < 17 || value.compactThresholdPct > 99)) {
-    throw new Error(`dsh-qwen38-local-qol: compactThresholdPct must be an integer 17..99, got ${String(value.compactThresholdPct)}`)
+      || value.compactThresholdPct < 50 || value.compactThresholdPct > 99)) {
+    throw new Error(`dsh-qwen38-local-qol: compactThresholdPct must be an integer 50..99, got ${String(value.compactThresholdPct)}`)
   }
   if (value.compaction !== undefined) {
     if (typeof value.compaction?.presetGenerated !== 'boolean') {

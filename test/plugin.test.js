@@ -5,6 +5,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as plugin from '../src/index.js'
 import { QwenLocalAdapter } from '../src/adapter.js'
+import { liveConfigView } from '../src/settings-section.js'
 
 /**
  * Fake plugin ctx mimicking the cordis runtime the plugin talks to:
@@ -92,6 +93,8 @@ test('apply: the adapter reads the live config reference per request (volatile c
   const fetchStub = stubFetch()
   try {
     plugin.apply(ctx, config)
+    // The compaction backend's live-config mirror is published by apply().
+    assert.equal(liveConfigView(), config)
     // First request: the default general line (llama.cpp wire: effort in
     // chat_template_kwargs, the budget top-level on both dialects).
     await streamOnce(registered, { reasoningEffort: 'medium' })

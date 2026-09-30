@@ -22,29 +22,37 @@
  * recommended row value is `maxTokens: 52428` (the stock 8192 default
  * truncates long local checkpoints); the wire also raises any compaction
  * call to the line's output cap, which covers presets without this row. The
- * trigger and trim knobs come from the user-settings
- * section (the Settings tab's section, `compactThresholdPct` and the
- * `summarize` block) when that namespace is registered, else from environment
- * variables (see {@link resolveTrimKnobs}) so the row carries no keys the
- * stock config schema does not know.
+ * trigger and trim knobs come from the plugin row's live config (the Settings
+ * tab's `compactThresholdPct` and `summarize` block, via the module mirror
+ * {@link liveConfigView}) while that row is mounted, else the legacy settings
+ * namespace, else environment variables (see {@link resolveTrimKnobs}) so the
+ * row carries no keys the stock config schema does not know.
  *
  * @module dsh-qwen38-local-qol/backend
  */
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
+import { plainConfig } from './config.js'
 import { prepareSummaryRegion, resolveTrimKnobs, DEFAULT_TRIM_KNOBS } from './prepare.js'
-import { NS } from './settings-section.js'
+import { NS, liveConfigView } from './settings-section.js'
 
 /** Inclusive bounds for the live trigger percent (mirrors `validateSection`). */
-const TRIGGER_PCT_MIN = 17
+const TRIGGER_PCT_MIN = 50
 const TRIGGER_PCT_MAX = 99
 
 /**
- * The user-settings section, live, when its namespace is registered (module
- * function, no private-member access, so prototype-only receivers keep working).
+ * The user-settings section, live. The 0.2.0 route: this module's mirror of
+ * the plugin row's config, published by the entry fiber (`publishLiveConfig`)
+ * and resolved through `plainConfig` per read, so hot commits are seen
+ * immediately. The legacy route, kept for the env layer and bare unit
+ * receivers that still serve one: a context settings namespace under
+ * {@link NS}. Module function, no private-member access, so prototype-only
+ * receivers keep working.
  * @param ctx - the engine's cordis context.
- * @returns the resolved section object, or undefined without it.
+ * @returns the resolved section object, or undefined without either route.
  */
 function settingsSection(ctx) {
+  const live = liveConfigView()
+  if (live !== null && typeof live === 'object') return plainConfig(live)
   const settings = typeof ctx?.get === 'function' ? ctx.get('settings') : undefined
   const section = typeof settings?.get === 'function' ? settings.get(NS) : undefined
   return section !== null && typeof section === 'object' ? section : undefined

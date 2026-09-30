@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import QwenLocalCompaction from '../src/backend.js'
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
-import { NS } from '../src/settings-section.js'
+import { NS, publishLiveConfig } from '../src/settings-section.js'
 
 /** A fake context serving one settings section (undefined = no namespace). */
 function ctxWithSection(section) {
@@ -79,6 +79,70 @@ test('backend: the live ratio rebuilds from the row base each evaluation (no dri
     assert.deepEqual(seen, [0.9, 0.7, 0.8])
   } finally {
     BasicCompactionEngine.prototype.compactIfNeeded = original
+  }
+})
+
+test('backend: the live-config mirror (the 0.2.0 route) feeds the ratio hot, over the legacy seam', async () => {
+  const original = BasicCompactionEngine.prototype.compactIfNeeded
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.compactIfNeeded = async function () {
+      seen.push(this.config.thresholdRatio)
+      return null
+    }
+    // A 0.2.0-shaped receiver: the settings service exists but carries no get(ns).
+    const ctx = { get: (name) => (name === 'settings' ? { describe: () => [] } : undefined) }
+    let current = 60
+    publishLiveConfig({ compactThresholdPct: { get: () => current } })
+    try {
+      const backend = engineWith(ctx)
+      await backend.compactIfNeeded('agent', 'pressure', undefined)
+      // A hot commit moves the wrapped leaf's get(); no republish is needed.
+      current = 70
+      await backend.compactIfNeeded('agent', 'pressure', undefined)
+    } finally {
+      publishLiveConfig(undefined)
+    }
+    // Mirror cleared and no legacy seam: the row base stands.
+    await engineWith(ctx).compactIfNeeded('agent', 'pressure', undefined)
+    // The mirror takes precedence over a legacy section carrying a different value.
+    publishLiveConfig({ compactThresholdPct: 55 })
+    try {
+      await engineWith(ctxWithSection({ compactThresholdPct: 90 })).compactIfNeeded('agent', 'pressure', undefined)
+    } finally {
+      publishLiveConfig(undefined)
+    }
+    assert.deepEqual(seen, [0.6, 0.7, 0.8, 0.55])
+  } finally {
+    BasicCompactionEngine.prototype.compactIfNeeded = original
+  }
+})
+
+test('backend: summarize trim knobs read the live-config mirror', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  const calls = []
+  try {
+    BasicCompactionEngine.prototype.summarize = async function (input) { calls.push(input); return { blocks: [] } }
+    const envBackup = process.env.DSH_QWEN38_SUMMARIZE_KEEP_TURNS
+    delete process.env.DSH_QWEN38_SUMMARIZE_KEEP_TURNS
+    publishLiveConfig({ summarize: { images: 'strip', keepTurns: 0, toolChars: 2000 } })
+    try {
+      const backend = Object.create(QwenLocalCompaction.prototype)
+      backend.ctx = { get: () => undefined }
+      const messages = [
+        { role: 'assistant', content: [{ type: 'reasoning', text: 'old thinking' }, { type: 'text', text: 't' }] },
+        { role: 'user', content: [{ type: 'text', text: 'q' }] },
+      ]
+      await backend.summarize({ messages }, 'the-agent', undefined)
+      assert.equal(calls.length, 1)
+      // keepTurns 0 came from the mirror, not the env: reasoning stripped.
+      assert.deepEqual(calls[0].messages[0].content, [{ type: 'text', text: 't' }])
+    } finally {
+      publishLiveConfig(undefined)
+      if (envBackup !== undefined) process.env.DSH_QWEN38_SUMMARIZE_KEEP_TURNS = envBackup
+    }
+  } finally {
+    BasicCompactionEngine.prototype.summarize = original
   }
 })
 

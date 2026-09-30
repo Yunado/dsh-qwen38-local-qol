@@ -17,7 +17,7 @@
  */
 import { QwenLocalAdapter } from './adapter.js'
 import { resolveConfig } from './config.js'
-import { Config, validateSection } from './settings-section.js'
+import { Config, liveConfigView, publishLiveConfig, validateSection } from './settings-section.js'
 
 export { QwenLocalAdapter, PROVIDER_NAME, PROVIDER_HTTP_ERROR_CODE, PROVIDER_UNREACHABLE_CODE } from './adapter.js'
 export {
@@ -42,6 +42,18 @@ export const inject = ['llm']
  */
 export function apply(ctx, config = {}) {
   const resolved = resolveConfig(config)
+  // Publish this row's live config reference for the compaction backend (a
+  // preset-fiber service that cannot reach this row through the 0.2.0 settings
+  // service - see settings-section's mirror docs). Stored wrapped: the backend
+  // resolves each volatile leaf per read, so hot commits need no republish.
+  publishLiveConfig(config)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(() => () => {
+      // A disposed row falls back to the row base instead of leaving a stale
+      // mirror; a newer mount's reference is never cleared by an older fiber.
+      if (liveConfigView() === config) publishLiveConfig(undefined)
+    })
+  }
   // The Settings surface: this plugin ships its own page (the browser half
   // registers a `settings.section`), so opt the auto-generated Config form
   // off for this entry - otherwise the host would render a second editor
