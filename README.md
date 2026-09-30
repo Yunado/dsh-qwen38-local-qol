@@ -16,7 +16,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.3.0` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it.
+You can also pin a specific release: add a tag to the spec (`#v0.3.0` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
 
 ## DSH compatibility
 
@@ -162,7 +162,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.0` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.0` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag —— `main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
