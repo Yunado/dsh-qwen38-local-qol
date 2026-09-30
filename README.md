@@ -37,8 +37,11 @@ cd ~/.dsh/profiles/web
 npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.0'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
-# 3) restart dsh web, then Settings -> Qwen3.8 Local: fill the line config once
-#    (the old settings.yaml section is not read by the new storage).
+# 3) restart dsh web. Sessions already on qwen38 keep working (same id, new
+#    declaration). For new sessions: if a different preset is your default,
+#    pick Qwen38 on the Agent presets page. Then open Settings -> Qwen3.8
+#    Local and fill the line config once (the old settings.yaml section is
+#    not read by the new storage).
 ```
 
 ![the qwen38 preset declared by the bundle patch, on the Agent presets page](<docs/qwen38 preset-en.png>)
@@ -180,8 +183,10 @@ cd ~/.dsh/profiles/web
 npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.0'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
-# 3) 重启 dsh web，然后 设置 -> Qwen3.8 本地：把线的配置填一遍
-#    （新的 profile 配置存储不读旧的 settings.yaml 节）。
+# 3) 重启 dsh web。已在用 qwen38 的会话无缝继续（同 id、新声明接管）。
+#    新会话：若你的默认是别的 preset，去 Agent 预设页把 Qwen38 设为默认。
+#    然后打开 设置 -> Qwen3.8 本地，把线的配置填一遍（新的 profile 配置
+#    存储不读旧的 settings.yaml 节）。
 ```
 
 ![bundle patch 声明的 qwen38 preset（Agent 预设页）](<docs/qwen38 preset-cn.png>)
