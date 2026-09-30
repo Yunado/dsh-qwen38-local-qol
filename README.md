@@ -11,8 +11,10 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.0
 ```
+
+Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
@@ -157,8 +159,10 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.0
 ```
+
+推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
