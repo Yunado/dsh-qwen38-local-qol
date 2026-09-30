@@ -61,8 +61,9 @@ const COPY = {
     contextWindow: 'Context window (tokens)',
     maxTokens: 'Output cap (tokens)',
     thinking: 'Thinking budgets',
+    defaultBudget: 'server thinking ceiling (declared)',
     thinkingAll: 'All efforts',
-    thinkingHintNinfer: 'NInfer reads its thinking budget at server startup (--default-thinking-budget); a per-request budget is not supported (ninfer as of 2026-09-14; ninfer-windows 0.7.1). Change the startup flag and restart the server.',
+    thinkingHintNinfer: 'NInfer fixes its thinking budget at server startup (--default-thinking-budget, no per-request budget; ninfer-windows 0.7.1, 2026-09-14). Set this field to the flag value; restart the NInfer server after changing it.',
     thinkingHintLlamacpp: 'Thinking hard cap, sent per request per selected level (overrides the server\'s --reasoning-budget flag).',
     thinkingHintTabbyapi: 'Thinking hard cap, sent per request per selected level (TabbyAPI native reasoning_budget_tokens).',
     thinkingHintOmlx: 'Thinking hard cap, sent per request per selected level (oMLX native thinking_budget).',
@@ -79,8 +80,10 @@ const COPY = {
     conflict: 'Someone else changed these settings while you were editing. Your edits were discarded; the current values are shown.',
     invalidNumber: 'Every number field must be a positive whole number.',
     compactTrigger: 'Compaction trigger',
-    compactTriggerHint: 'Automatic compaction fires at window × this ratio; the slider caps where the line output reservation leaves room (currently {cap}%).',
+    compactTriggerHint: 'Automatic compaction fires at this percentage of the window. The slider also syncs the output cap to keep the point exact (the guard stays a quarter of that cap). At the current cap the guard is {guard} tokens.',
     invalidPct: 'Trigger percent must be a whole number 50..99.',
+    budgetCap: 'Every thinking budget (low/medium/xhigh and the default) must stay below the output cap: thinking and answers share it.',
+    squeezeBlocked: 'This point needs the output cap at or below {cap}, which cuts into the thinking budgets. Lower a thinking budget, or move the slider down, before saving.',
     remoteError: 'Settings request failed: ',
     compactionNotSet: 'The qwen38 preset is not declared by the installed plugin bundle (reinstall or update the plugin, then restart dsh web).',
     compactionActive: 'Local compaction is active for new sessions (default preset: qwen38).',
@@ -106,8 +109,9 @@ const COPY = {
     contextWindow: '上下文窗口（token）',
     maxTokens: '输出上限（token）',
     thinking: 'Thinking 预算',
+    defaultBudget: '服务端 thinking 上限（申报）',
     thinkingAll: '全部 effort',
-    thinkingHintNinfer: 'NInfer 的 thinking 预算在服务启动时设定（--default-thinking-budget 启动参数，不支持逐请求，ninfer as of 2026-09-14；ninfer-windows 0.7.1）。改启动参数后重启服务生效。',
+    thinkingHintNinfer: 'NInfer 的 thinking 预算由启动参数 --default-thinking-budget 定死（不支持逐请求；ninfer-windows 0.7.1，2026-09-14）。把这格填成该参数的值，改参数后重启 NInfer 服务。',
     thinkingHintLlamacpp: 'thinking 硬帽，逐请求按所选档发送（覆盖服务端 --reasoning-budget）。',
     thinkingHintTabbyapi: 'thinking 硬帽，逐请求按所选档发送（TabbyAPI 原生 reasoning_budget_tokens）。',
     thinkingHintOmlx: 'thinking 硬帽，逐请求按所选档发送（oMLX 原生 thinking_budget）。',
@@ -124,8 +128,10 @@ const COPY = {
     conflict: '编辑期间他人修改了这些设置。你的改动已丢弃，当前显示的是最新值。',
     invalidNumber: '所有数字字段必须是正整数。',
     compactTrigger: '压缩触发点',
-    compactTriggerHint: '自动压缩在 窗口 × 该比例 处触发；滑块上限已按输出上限预留（当前上限 {cap}%）。',
+    compactTriggerHint: '自动压缩在窗口的该百分比处触发；滑杆同时联动输出上限以保证该点精确落地（墙护始终为该上限的 1/4）。当前上限对应的墙护为 {guard} token。',
     invalidPct: '触发比例必须是 50 到 99 的整数。',
+    budgetCap: '每档 thinking 预算（低/中/超高）及默认预算必须小于输出上限：思考与回答共用同一个帽。',
+    squeezeBlocked: '该触发点需要把输出上限降到 {cap} 以下，这会挤占 thinking 预算。请先调低某档 thinking 预算，或把滑杆调低，再保存。',
     remoteError: '设置请求失败：',
     compactionNotSet: 'qwen38 预设未由已安装的插件 bundle 声明（重装或更新插件后重启 dsh web）。',
     compactionActive: '本地压缩对新会话生效（默认预设：qwen38）。',
@@ -182,21 +188,22 @@ function digitsOnly(setValue) {
 
 /**
  * The built-in window defaults per line, mirroring `resolveConfig`: every
- * standard line opens on a 256K context with the ~20%-of-window output cap
- * (headroom for the compaction trigger at 0.8× contextWindow).
+ * line opens on a starter 128K context with a small 16K output cap, numbers
+ * a fresh install's local server can actually host (users raise them per
+ * line to match the real server context).
  */
 const LINE_WINDOW_DEFAULTS = Object.freeze({
-  ninfer: { contextWindow: 262144, maxTokens: 52428 },
-  llamacpp: { contextWindow: 262144, maxTokens: 52428 },
-  tabbyapi: { contextWindow: 262144, maxTokens: 52428 },
-  omlx: { contextWindow: 262144, maxTokens: 52428 },
+  ninfer: { contextWindow: 131072, maxTokens: 16384 },
+  llamacpp: { contextWindow: 131072, maxTokens: 16384 },
+  tabbyapi: { contextWindow: 131072, maxTokens: 16384 },
+  omlx: { contextWindow: 131072, maxTokens: 16384 },
 })
 
 /**
  * The active line's wall guard, mirroring the backend's `wallGuardTokens`:
- * a quarter of the output cap (one step's growth is bounded by one
- * completion), shrunk to a quarter of the remaining budget on narrow lines,
- * so the trigger never sits closer to the request wall than that.
+ * the linear safety wiggle above the cap - a quarter of the output cap,
+ * clamped to a quarter of the remaining budget on narrow lines, floored at
+ * 1024 so tiny windows keep something. A bigger cap earns a bigger guard.
  * @param windowTokens - the active line's context window.
  * @param outputTokens - the active line's output cap.
  * @returns the guard in tokens.
@@ -204,9 +211,39 @@ const LINE_WINDOW_DEFAULTS = Object.freeze({
 export function compactionWallGuardTokens(windowTokens, outputTokens) {
   if (!Number.isInteger(windowTokens) || windowTokens <= 0
     || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
-    return 16384
+    return 10000
   }
-  return Math.min(Math.floor(outputTokens / 4), Math.floor((windowTokens - outputTokens) / 4))
+  const room = Math.min(
+    Math.floor(outputTokens / 4),
+    Math.floor((windowTokens - outputTokens) / 4),
+  )
+  return Math.max(1024, room)
+}
+
+/**
+ * The cap the compaction slider pins the output cap to (bidirectional sync):
+ * the largest cap whose guard still leaves `pct% x window` reachable,
+ * `cap + guard(cap) <= window x (100 - pct) / 100` with guard = cap/4, i.e.
+ * `cap = floor(window x (100 - pct) / 125)`. When that cap would cut under
+ * the thinking budgets' room (max budget + 2048, since thinking and answers
+ * share the cap), the point cannot land: report `red` and park the cap at the
+ * room - the tab shows a red checker naming the cap the point needs, and the
+ * save is refused until a thinking budget drops or the slider moves back.
+ * @param windowTokens - the active line's context window.
+ * @param pct - the slider percent being requested.
+ * @param maxThinkingBudget - the largest configured thinking budget (0/invalid parks the room at 1024).
+ * @returns { cap, neededCap, red } or null when the geometry is invalid.
+ */
+export function compactionCapSync(windowTokens, pct, maxThinkingBudget) {
+  if (!Number.isInteger(windowTokens) || windowTokens <= 0
+    || !Number.isInteger(pct) || pct < 50 || pct > 99) {
+    return null
+  }
+  const neededCap = Math.max(1024, Math.floor((windowTokens * (100 - pct)) / 125))
+  if (windowTokens - neededCap < 2) return null
+  const room = Number.isInteger(maxThinkingBudget) && maxThinkingBudget > 0 ? maxThinkingBudget + 2048 : 1024
+  const red = neededCap < room
+  return { cap: red ? Math.min(room, windowTokens - 1) : neededCap, neededCap, red }
 }
 
 /**
@@ -229,10 +266,10 @@ function lineRecord(name, raw, fallback) {
     apiKey: src.apiKey ?? '',
     contextWindow: String(src.contextWindow ?? d.contextWindow),
     maxTokens: String(src.maxTokens ?? d.maxTokens),
-    low: String(src.thinkingBudgets?.low ?? 4096),
-    medium: String(src.thinkingBudgets?.medium ?? 8192),
-    xhigh: String(src.thinkingBudgets?.xhigh ?? 16384),
-    defaultThinkingBudget: String(src.defaultThinkingBudget ?? 16384),
+    low: String(src.thinkingBudgets?.low ?? 2048),
+    medium: String(src.thinkingBudgets?.medium ?? 4096),
+    xhigh: String(src.thinkingBudgets?.xhigh ?? 8192),
+    defaultThinkingBudget: String(src.defaultThinkingBudget ?? 8192),
     images: src.summarize?.images ?? 'strip',
     keepTurns: String(src.summarize?.keepTurns ?? 5),
     toolChars: String(src.summarize?.toolChars ?? 2000),
@@ -379,6 +416,26 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       setState((s) => ({ ...s, error: t.invalidPct }))
       return
     }
+    // Preset-style cross check: every effort's thinking budget (and the
+    // default) shares the line's output cap, so each must stay below it.
+    const budgetsFit = (capText, budgetTexts) => budgetTexts.every((text) => Number.parseInt(text, 10) < Number.parseInt(capText, 10))
+    const activeFits = budgetsFit(draft.maxTokens, [draft.low, draft.medium, draft.xhigh, draft.defaultBudget])
+    const linesFit = Object.values(draft.lines).every((line) => budgetsFit(line.maxTokens, [line.low, line.medium, line.xhigh, line.defaultThinkingBudget]))
+    if (!activeFits || !linesFit) {
+      setState((s) => ({ ...s, error: t.budgetCap }))
+      return
+    }
+    // The slider keeps the trigger point exact by syncing the output cap to
+    // `max(1024, window x (100-pct)/125)`. When that cap would fall under the
+    // thinking budgets' room the point cannot land at all, so the same red
+    // checker the tab shows also refuses the save.
+    const neededCap = Math.max(1024, Math.floor((Number.parseInt(draft.contextWindow, 10) * (100 - compactPct)) / 125))
+    const maxBudget = Math.max(0, ...[draft.low, draft.medium, draft.xhigh, draft.defaultBudget].map((text) => Number.parseInt(text, 10)))
+    const room = maxBudget > 0 ? maxBudget + 2048 : 1024
+    if (neededCap < room) {
+      setState((s) => ({ ...s, error: t.squeezeBlocked.replace('{cap}', neededCap.toLocaleString('en-US')) }))
+      return
+    }
     setState((s) => ({ ...s, busy: true, error: null }))
     // The top-level fields are what the adapter and the compaction backend
     // read (the active line); `lines` persists every line — connection, window
@@ -479,23 +536,29 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     defaultPreset: state.agentPresets?.defaultPreset ?? view.value.compaction?.defaultPreset ?? 'standard',
   }
   const ninfer = draft.dialect === 'ninfer'
-  // Trigger slider geometry: the token point of the current percent and the
-  // percent cap left once the active line's output reservation and the wall
-  // guard are subtracted (recomputed live while the window/output inputs are
-  // edited; matches the engine's floor(min(ratio x window, budget))).
+  // Trigger slider: the percent IS the compaction point. Dragging it also
+  // syncs the output cap (both directions) to the largest cap that keeps the
+  // point reachable under the linear guard `cap/4` - `cap = window x
+  // (100-pct)/125` - so the engine's two branches meet at exactly `pct x
+  // window`. When that cap would dip under the thinking budgets' room the
+  // point cannot land: the cap parks at the room, a red checker names the cap
+  // the point wanted, and the save is refused until a budget drops.
   const windowTokens = /^\d+$/.test(draft.contextWindow) ? Number.parseInt(draft.contextWindow, 10) : 0
   const outputTokens = /^\d+$/.test(draft.maxTokens) ? Number.parseInt(draft.maxTokens, 10) : 0
-  const pressureBudget = windowTokens > 0 && outputTokens >= 0 && windowTokens > outputTokens
-    ? windowTokens - outputTokens - compactionWallGuardTokens(windowTokens, outputTokens)
-    : 0
-  const triggerCapPct = pressureBudget > 0
-    ? Math.max(50, Math.min(99, Math.floor((pressureBudget * 100) / windowTokens)))
-    : 99
+  const geometryOk = windowTokens > 0 && outputTokens >= 0 && windowTokens > outputTokens
   const compactPctDraft = /^\d+$/.test(draft.compactPct) ? Number.parseInt(draft.compactPct, 10) : 80
-  const compactPctClamped = Math.min(Math.max(50, compactPctDraft), triggerCapPct)
-  const triggerTokens = pressureBudget > 0
-    ? Math.floor(Math.min((windowTokens * compactPctClamped) / 100, pressureBudget))
-    : Math.round((windowTokens * compactPctClamped) / 100)
+  const sliderPct = Math.min(Math.max(50, compactPctDraft), 90)
+  const maxBudget = Math.max(0, ...[draft.low, draft.medium, draft.xhigh, draft.defaultBudget]
+    .map((text) => /^\d+$/.test(String(text)) ? Number.parseInt(text, 10) : 0))
+  const capSync = compactionCapSync(windowTokens, sliderPct, maxBudget)
+  const wallGuard = compactionWallGuardTokens(windowTokens, outputTokens)
+  const triggerTokens = geometryOk
+    ? Math.floor(Math.min((windowTokens * sliderPct) / 100, windowTokens - outputTokens - wallGuard))
+    : Math.round((windowTokens * sliderPct) / 100)
+  // When the cap is wider than this point affords (typed by hand, or parked at
+  // the budget room), label the clamped point's effective ratio.
+  const budgetClamped = geometryOk && triggerTokens < Math.floor((windowTokens * sliderPct) / 100)
+  const labelPct = budgetClamped ? Math.floor((triggerTokens * 100) / windowTokens) : sliderPct
   return React.createElement('div', { className: 'qol' },
     React.createElement('h2', { className: 'qol-title' }, t.title),
     state.error !== null
@@ -567,6 +630,16 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
             React.createElement(Input, { className: 'qol-input', inputMode: 'numeric', disabled: ninfer, value: draft[effort], onChange: digitsOnly((v) => { setDraft({ [effort]: v }) }) })),
         ),
       ),
+      // The declared server ceiling, NInfer only: that line ignores every
+      // per-request budget, so its real thinking number lives in the startup
+      // flag and this field is the plugin's only window into it. The output
+      // cap guard and the slider's red checker clamp against this declared
+      // number. Other lines think from the per-effort map alone, nothing a
+      // server flag could add, so the field is hidden there.
+      ninfer && React.createElement('div', { className: 'qol-row3' },
+        React.createElement(Field, { label: t.defaultBudget },
+          React.createElement(Input, { className: 'qol-input', inputMode: 'numeric', value: draft.defaultBudget, onChange: digitsOnly((v) => { setDraft({ defaultBudget: v }) }) })),
+      ),
       React.createElement('p', { className: 'qol-hint' }, ninfer ? t.thinkingHintNinfer : draft.dialect === 'tabbyapi' ? t.thinkingHintTabbyapi : draft.dialect === 'omlx' ? t.thinkingHintOmlx : t.thinkingHintLlamacpp),
     ),
     // Compaction: the wiring status first (the trim controls only apply to
@@ -586,20 +659,35 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
           React.createElement('span', { className: 'qol-switchLabel' }, t.compactTrigger),
           React.createElement('span', { className: 'qol-sliderValue' },
             windowTokens > 0
-              ? `${compactPctClamped}% · ~${(triggerTokens / 1000).toFixed(1)}K / ${(windowTokens / 1000).toFixed(0)}K`
-              : `${compactPctClamped}%`),
+              ? `${labelPct}% · ~${(triggerTokens / 1000).toFixed(1)}K / ${(windowTokens / 1000).toFixed(0)}K`
+              : `${labelPct}%`),
         ),
         React.createElement('input', {
           className: 'qol-slider',
           type: 'range',
           min: 50,
-          max: triggerCapPct,
+          max: 90,
           step: 1,
-          value: compactPctClamped,
+          value: sliderPct,
           'aria-label': t.compactTrigger,
-          onChange: (e) => { setDraft({ compactPct: e.target.value }) },
+          onChange: (e) => {
+            const pct = Number.parseInt(e.target.value, 10)
+            const next = { compactPct: e.target.value }
+            // Slider-driven cap sync (both directions): the cap follows to the
+            // largest value that keeps this exact point reachable, or parks at
+            // the thinking budgets' room when the point cannot land (the red
+            // checker and refused save carry that case).
+            const sync = compactionCapSync(windowTokens, pct, maxBudget)
+            if (sync !== null) next.maxTokens = String(sync.cap)
+            setDraft(next)
+          },
         }),
-        React.createElement('p', { className: 'qol-hint' }, t.compactTriggerHint.replace('{cap}', String(triggerCapPct))),
+        // One line, two states: the normal hint under the slider turns into
+        // the red checker text when the point cannot land on the budgets.
+        capSync !== null && capSync.red
+          ? React.createElement('p', { className: 'qol-error', role: 'alert' },
+            t.squeezeBlocked.replace('{cap}', capSync.neededCap.toLocaleString('en-US')))
+          : React.createElement('p', { className: 'qol-hint' }, t.compactTriggerHint.replace('{guard}', wallGuard.toLocaleString('en-US'))),
       ),
       React.createElement('div', { className: 'qol-field' },
         React.createElement('div', { className: 'qol-switchHead' },

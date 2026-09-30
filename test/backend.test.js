@@ -52,7 +52,28 @@ test('backend: the wall guard shrinks to a quarter of the pressure budget on nar
     }
     await engineWith(ctxWithSection({ compactThresholdPct: 90, contextWindow: 40000, maxTokens: 20000 })).compactIfNeeded('agent', 'pressure', undefined)
     await engineWith(ctxWithSection({ compactThresholdPct: 90 })).compactIfNeeded('agent', 'pressure', undefined)
-    assert.deepEqual(seen, [5000, 16384])
+    assert.deepEqual(seen, [5000, 10000])
+  } finally {
+    BasicCompactionEngine.prototype.compactIfNeeded = original
+  }
+})
+
+test('backend: headroomTokens is the linear quarter-of-cap guard, independent of percent', async () => {
+  const original = BasicCompactionEngine.prototype.compactIfNeeded
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.compactIfNeeded = async function () {
+      seen.push({ headroomTokens: this.config.headroomTokens, thresholdRatio: this.config.thresholdRatio })
+      return null
+    }
+    // Same 262144/40960 line at several percents: the guard is a quarter of the
+    // cap regardless of percent (the slider moves the ratio; the settings tab
+    // keeps the cap synced), while the ratio follows the percent.
+    for (const pct of [50, 84, 90, 95]) {
+      await engineWith(ctxWithSection({ compactThresholdPct: pct, contextWindow: 262144, maxTokens: 40960 })).compactIfNeeded('agent', 'pressure', undefined)
+    }
+    assert.deepEqual(seen.map((s) => s.headroomTokens), [10240, 10240, 10240, 10240])
+    assert.deepEqual(seen.map((s) => s.thresholdRatio), [0.5, 0.84, 0.9, 0.95])
   } finally {
     BasicCompactionEngine.prototype.compactIfNeeded = original
   }

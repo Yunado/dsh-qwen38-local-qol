@@ -43,36 +43,52 @@ const TRIGGER_PCT_MIN = 50
 const TRIGGER_PCT_MAX = 99
 
 /**
- * Tokens kept between the highest compaction trigger and the request wall
- * (`contextWindow - output cap`). A step boundary only measures the last
- * request; the next one grows by up to one completion (bounded by the output
- * cap) plus its tool results and injected context, so a trigger at the wall
- * itself admits requests the server rejects with a context-overflow 400. The
- * guard is a quarter of the line's output cap, so the top trigger sits at
- * `window - output - output/4`; a narrow window shrinks it to a quarter of
- * the remaining budget. Mirrored by the client's slider cap.
+ * The wall guard (the engine's `headroomTokens`): a linear safety wiggle above
+ * the output cap - a quarter of it, clamped to a quarter of the remaining
+ * budget on narrow lines and floored at 1024 so tiny windows keep something.
+ * The slider sets the trigger percent directly; the settings tab syncs the
+ * output cap to the largest value that keeps `pct x window` reachable
+ * (`cap + guard(cap) <= window x (100-pct)/100`), so with this guard the
+ * engine's two branches - `window x ratio` and `window - output - headroom` -
+ * meet at exactly the requested point. A bigger cap earns a bigger guard;
+ * a small window shrinks both.
  */
-const WALL_GUARD_TOKENS = 16384
+const WALL_GUARD_MIN_TOKENS = 1024
+
+/** Fallback guard when the section carries no usable geometry. */
+const WALL_GUARD_FALLBACK_TOKENS = 10000
 
 /** Unwrap one value a volatile leaf may deliver wrapped. */
 function plainValue(value) {
   return value !== null && typeof value === 'object' && typeof value.get === 'function' ? value.get() : value
 }
 
+/** The active line's geometry, or undefined when the section is unusable. */
+function wallGeometry(section) {
+  const windowTokens = plainValue(section?.contextWindow)
+  const outputTokens = plainValue(section?.maxTokens)
+  const ok = Number.isInteger(windowTokens) && windowTokens > 0
+    && Number.isInteger(outputTokens) && outputTokens >= 0 && windowTokens > outputTokens
+  return ok ? { windowTokens, outputTokens } : undefined
+}
+
 /**
  * The wall guard for the active line: the section mirrors the active line's
- * `contextWindow` / `maxTokens`, so the guard follows that line.
+ * `contextWindow` / `maxTokens`, so the guard follows that line. Mirrored by
+ * the client's cap sync.
  * @param section - the resolved user-settings section (or undefined).
  * @returns the token count for the engine config's `headroomTokens`.
  */
 function wallGuardTokens(section) {
-  const windowTokens = plainValue(section?.contextWindow)
-  const outputTokens = plainValue(section?.maxTokens)
-  if (!Number.isInteger(windowTokens) || windowTokens <= 0
-    || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
-    return WALL_GUARD_TOKENS
+  const geometry = wallGeometry(section)
+  if (geometry === undefined) {
+    return WALL_GUARD_FALLBACK_TOKENS
   }
-  return Math.min(Math.floor(outputTokens / 4), Math.floor((windowTokens - outputTokens) / 4))
+  const room = Math.min(
+    Math.floor(geometry.outputTokens / 4),
+    Math.floor((geometry.windowTokens - geometry.outputTokens) / 4),
+  )
+  return Math.max(WALL_GUARD_MIN_TOKENS, room)
 }
 
 /**
@@ -119,11 +135,12 @@ export class QwenLocalCompaction extends BasicCompactionEngine {
   }
 
   /**
-   * Apply the live trigger ratio and the wall guard to the engine config,
-   * then delegate: the pressure decision stays the stock path
-   * (`min(window x thresholdRatio, window - reserved output - headroomTokens)`),
-   * with the slider refreshing the ratio and `headroomTokens` holding the
-   * trigger back from the request wall by one step's growth. Without a live
+   * Apply the live trigger ratio and the linear wall guard to the engine
+   * config, then delegate: the pressure decision stays the stock path
+   * (`min(window x thresholdRatio, window - reserved output - headroomTokens)`).
+   * The slider sets the ratio directly; the settings tab keeps the output cap
+   * synced so the two branches meet at exactly `ratio x window`, and the guard
+   * (a quarter of the cap) is the safety wiggle below the wall. Without a live
    * ratio the row base's ratio stands, so a removed setting never leaves a
    * stale one; the guard applies either way.
    * @param agent - agent whose latest durable routed request is measured.

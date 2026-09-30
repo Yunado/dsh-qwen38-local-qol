@@ -191,14 +191,14 @@ test('client: an already-matching default-model row is not rewritten (no-op writ
   assert.equal(updateCalls[0].ns, 'qwen38')
 })
 
-test('toDraft: a fresh section (no user layer) ships the production defaults pre-filled', () => {
+test('toDraft: a fresh section (no user layer) ships the built-in starter defaults pre-filled', () => {
   const draft = client.toDraft({ dialect: 'ninfer', baseURL: 'http://localhost:8082/v1', model: 'qwen3.8-27b-nvfp4' })
-  assert.equal(draft.contextWindow, '262144')
-  assert.equal(draft.maxTokens, '52428')
-  assert.equal(draft.low, '4096')
-  assert.equal(draft.medium, '8192')
-  assert.equal(draft.xhigh, '16384')
-  assert.equal(draft.defaultBudget, '16384')
+  assert.equal(draft.contextWindow, '131072')
+  assert.equal(draft.maxTokens, '16384')
+  assert.equal(draft.low, '2048')
+  assert.equal(draft.medium, '4096')
+  assert.equal(draft.xhigh, '8192')
+  assert.equal(draft.defaultBudget, '8192')
   assert.equal(draft.images, 'strip')
   assert.equal(draft.keepTurns, '5')
   assert.equal(draft.toolChars, '2000')
@@ -209,14 +209,14 @@ test('toDraft: a fresh section (no user layer) ships the production defaults pre
   assert.equal(draft.apiKey, '')
   // The other lines park at their built-in defaults.
   assert.equal(draft.lines.llamacpp.baseURL, '')
-  assert.equal(draft.lines.llamacpp.contextWindow, '262144')
+  assert.equal(draft.lines.llamacpp.contextWindow, '131072')
   assert.equal(draft.lines.tabbyapi.baseURL, '')
-  assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
+  assert.equal(draft.lines.tabbyapi.contextWindow, '131072')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '16384')
   assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '262144')
-  assert.equal(draft.lines.omlx.maxTokens, '52428')
-  assert.equal(draft.lines.ninfer.xhigh, '16384')
+  assert.equal(draft.lines.omlx.contextWindow, '131072')
+  assert.equal(draft.lines.omlx.maxTokens, '16384')
+  assert.equal(draft.lines.ninfer.xhigh, '8192')
   // The trigger point is shared across lines and ships at 80 percent.
   assert.equal(draft.compactPct, '80')
 })
@@ -267,11 +267,11 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.lines.ninfer.toolChars, '1000')
   // The unpersisted TabbyAPI and oMLX lines park at their built-in defaults.
   assert.equal(draft.lines.tabbyapi.baseURL, '')
-  assert.equal(draft.lines.tabbyapi.contextWindow, '262144')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '52428')
+  assert.equal(draft.lines.tabbyapi.contextWindow, '131072')
+  assert.equal(draft.lines.tabbyapi.maxTokens, '16384')
   assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '262144')
-  assert.equal(draft.lines.omlx.maxTokens, '52428')
+  assert.equal(draft.lines.omlx.contextWindow, '131072')
+  assert.equal(draft.lines.omlx.maxTokens, '16384')
 })
 
 test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {
@@ -342,13 +342,39 @@ test('toDraft: an omlx-active section lifts the MLX line onto the inputs', () =>
   assert.equal(draft.lines.tabbyapi.baseURL, '')
 })
 
-test('compactionWallGuardTokens mirrors the backend guard and its clamps', () => {
-  // A quarter of the output cap is the guard.
+test('compactionWallGuardTokens mirrors the backend linear guard', () => {
+  // The guard is a quarter of the cap; a bigger cap earns a bigger guard.
   assert.equal(client.compactionWallGuardTokens(262144, 40960), 10240)
-  assert.equal(client.compactionWallGuardTokens(262144, 52428), 13107)
+  assert.equal(client.compactionWallGuardTokens(262144, 104857), 26214)
   // Narrow line: a quarter of the remaining budget caps the guard.
   assert.equal(client.compactionWallGuardTokens(40000, 20000), 5000)
-  // Degenerate geometry falls back to the backend constant.
-  assert.equal(client.compactionWallGuardTokens(0, 0), 16384)
-  assert.equal(client.compactionWallGuardTokens(20000, 20000), 16384)
+  assert.equal(client.compactionWallGuardTokens(65536, 57344), 2048)
+  // Tiny caps keep the 1024 floor.
+  assert.equal(client.compactionWallGuardTokens(262144, 2048), 1024)
+  // Degenerate geometry falls back to the legacy floor.
+  assert.equal(client.compactionWallGuardTokens(0, 0), 10000)
+  assert.equal(client.compactionWallGuardTokens(20000, 20000), 10000)
+})
+
+test('compactionCapSync slides the output cap with the slider, both directions', () => {
+  // Production geometry with xhigh 32768 (room 34,816): exact caps while the
+  // point can land...
+  assert.deepEqual(client.compactionCapSync(262144, 50, 32768), { cap: 104857, neededCap: 104857, red: false })
+  assert.deepEqual(client.compactionCapSync(262144, 60, 32768), { cap: 83886, neededCap: 83886, red: false })
+  assert.deepEqual(client.compactionCapSync(262144, 80, 32768), { cap: 41943, neededCap: 41943, red: false })
+  assert.deepEqual(client.compactionCapSync(262144, 83, 32768), { cap: 35651, neededCap: 35651, red: false })
+  // ...and park at the room, red, when the cap the point needs cuts into the
+  // thinking budgets (84 needs 33,554 < 34,816).
+  assert.deepEqual(client.compactionCapSync(262144, 84, 32768), { cap: 34816, neededCap: 33554, red: true })
+  assert.deepEqual(client.compactionCapSync(262144, 90, 32768), { cap: 34816, neededCap: 20971, red: true })
+  // Smaller budgets open the right end: with xhigh 8192 the room is 10,240,
+  // so even 90 (needing 20,971) lands clean.
+  assert.deepEqual(client.compactionCapSync(262144, 90, 8192), { cap: 20971, neededCap: 20971, red: false })
+  // Small windows get small guards, and can still go red at the edge.
+  assert.deepEqual(client.compactionCapSync(32768, 70, 4096), { cap: 7864, neededCap: 7864, red: false })
+  assert.deepEqual(client.compactionCapSync(32768, 90, 4096), { cap: 6144, neededCap: 2621, red: true })
+  // Out-of-band percent and broken geometry yield null.
+  assert.equal(client.compactionCapSync(262144, 40, 32768), null)
+  assert.equal(client.compactionCapSync(262144, 100, 32768), null)
+  assert.equal(client.compactionCapSync(0, 80, 32768), null)
 })

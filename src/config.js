@@ -81,42 +81,45 @@ export const DIALECT_OMLX = 'omlx'
  */
 export const DIALECTS = Object.freeze([DIALECT_LLAMACPP, DIALECT_NINFER, DIALECT_TABBYAPI, DIALECT_OMLX])
 
-/** Shared context window of the standard lines (256K; the ExLlamaV3 cache sizing). */
-export const DEFAULT_CONTEXT_WINDOW = 262144
+/** Shared context window of the fresh-install defaults (128K; a context most
+ *  local servers can actually host. The tab's numbers must never exceed the
+ *  server's real context, so defaults aim low and users raise them per line. */
+export const DEFAULT_CONTEXT_WINDOW = 131072
 
 /**
- * Output cap ≈ 20% of the context window (0.2 × 262144): compaction triggers
- * at 0.8 × contextWindow, leaving this headroom for the final response so a
- * full-length answer never overruns the window.
+ * Output cap for the fresh-install defaults: a quarter of the window leaves
+ * the trigger's wall guard (a quarter of the cap) plus the thinking budgets'
+ * room comfortably inside the message budget, so the whole slider band lands.
  */
-export const DEFAULT_MAX_TOKENS = 52428
+export const DEFAULT_MAX_TOKENS = 16384
 
 /**
- * TabbyAPI line defaults: the ExLlamaV3 server for Qwen3.8-Flash-Next 4.05bpw
- * EXL3 (256K context, the EXL3 cache allocation). The output cap follows the
- * same ~20%-of-window headroom rule as the other lines.
+ * TabbyAPI line defaults: the ExLlamaV3 server for Qwen3.8-Flash-Next EXL3.
+ * The fresh-install pair matches the shared low defaults; ExLlamaV3 users
+ * commonly raise both (its cache sizing then has to match in the server too).
  */
 export const DEFAULT_TABBYAPI_BASE_URL = 'http://localhost:8083/v1'
 export const DEFAULT_TABBYAPI_MODEL = 'Qwen3.8-Flash-Next-4.05bpw'
-export const DEFAULT_TABBYAPI_CONTEXT_WINDOW = 262144
-export const DEFAULT_TABBYAPI_MAX_TOKENS = 52428
+export const DEFAULT_TABBYAPI_CONTEXT_WINDOW = 131072
+export const DEFAULT_TABBYAPI_MAX_TOKENS = 16384
 
 /**
  * oMLX line defaults: the Apple Silicon MLX server for Qwen3.8-27B (port
- * 8000). The window pair follows the shared standard-line defaults like
- * every other line; adjust per machine (a Mac MLX profile may run a smaller
- * context than 256K).
+ * 8000). oMLX ships at a 32K context out of the box, so the admin panel's
+ * Global Settings (Max Context Window / Max Tokens, hot) must raise both to
+ * meet the tab's declared numbers.
  */
 export const DEFAULT_OMLX_BASE_URL = 'http://localhost:8000/v1'
 export const DEFAULT_OMLX_MODEL = 'Qwen3.8-27B-MLX-8bit'
-export const DEFAULT_OMLX_CONTEXT_WINDOW = 262144
-export const DEFAULT_OMLX_MAX_TOKENS = 52428
+export const DEFAULT_OMLX_CONTEXT_WINDOW = 131072
+export const DEFAULT_OMLX_MAX_TOKENS = 16384
 
-/** Per-effort hard thinking budgets of the production line. */
+/** Per-effort hard thinking budgets of the fresh-install defaults (small and
+ *  consistent across all lines; each stays well under the default output cap). */
 export const DEFAULT_THINKING_BUDGETS = Object.freeze({
-  low: 4096,
-  medium: 8192,
-  xhigh: 16384,
+  low: 2048,
+  medium: 4096,
+  xhigh: 8192,
 })
 
 /**

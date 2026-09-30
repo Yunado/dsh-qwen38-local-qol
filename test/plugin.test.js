@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import * as plugin from '../src/index.js'
 import { QwenLocalAdapter } from '../src/adapter.js'
 import { liveConfigView } from '../src/settings-section.js'
+import { DEFAULT_THINKING_BUDGETS } from '../src/config.js'
 
 /**
  * Fake plugin ctx mimicking the cordis runtime the plugin talks to:
@@ -101,7 +102,7 @@ test('apply: the adapter reads the live config reference per request (volatile c
     let sent = JSON.parse(fetchStub.requests.at(-1).body)
     assert.equal(sent.model, 'qwen3.8-27b')
     assert.equal(sent.chat_template_kwargs.reasoning_effort, 'medium')
-    assert.equal(sent.reasoning_budget_tokens, 8192)
+    assert.equal(sent.reasoning_budget_tokens, DEFAULT_THINKING_BUDGETS.medium)
 
     // A volatile commit mutates the SAME config reference (the loader commits
     // into running references); the next request carries the new values

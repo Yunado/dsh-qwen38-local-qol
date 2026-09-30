@@ -37,6 +37,20 @@ test('validateSection: an out-of-range compaction trigger fails loud', () => {
   validateSection({ compactThresholdPct: 99 })
 })
 
+test('validateSection: every thinking budget must stay below the output cap', () => {
+  // Top level: a budget at or over the cap shares the same wire cap as the
+  // answer, so it is refused at the write.
+  assert.throws(() => validateSection({ maxTokens: 20480, thinkingBudgets: { xhigh: 32768 } }), /thinkingBudgets\["xhigh"\]/)
+  assert.throws(() => validateSection({ maxTokens: 20480, thinkingBudgets: { xhigh: 20480 } }), /thinkingBudgets\["xhigh"\]/)
+  assert.throws(() => validateSection({ maxTokens: 8192, thinkingBudgets: { low: 4096 }, defaultThinkingBudget: 8192 }), /defaultThinkingBudget/)
+  validateSection({ maxTokens: 20480, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }, defaultThinkingBudget: 8192 })
+  // Per line: the same check rides each parked line's own cap.
+  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 40960, thinkingBudgets: { xhigh: 57344 } } } }), /lines\.ninfer\.thinkingBudgets/)
+  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 57344, defaultThinkingBudget: 57344 } } }), /lines\.ninfer\.defaultThinkingBudget/)
+  // The production ninfer shape (hardcoded 57344 default under a 65536 cap) passes.
+  validateSection({ lines: { ninfer: { maxTokens: 65536, thinkingBudgets: { low: 8192, medium: 32768, xhigh: 32768 }, defaultThinkingBudget: 57344 } } })
+})
+
 test('sectionSchema: a fully-default value opens on the general default (llama.cpp line)', () => {
   const schema = sectionSchema()
   const resolved = schema({})
@@ -48,7 +62,7 @@ test('sectionSchema: a fully-default value opens on the general default (llama.c
   assert.equal(resolved.contextWindow, DEFAULT_CONTEXT_WINDOW)
   assert.equal(resolved.maxTokens, DEFAULT_MAX_TOKENS)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
-  assert.equal(resolved.defaultThinkingBudget, 16384)
+  assert.equal(resolved.defaultThinkingBudget, DEFAULT_THINKING_BUDGETS.xhigh)
   assert.equal(resolved.defaultEffort, 'medium')
   assert.deepEqual(resolved.thinkingLevelMap, {})
   assert.equal(resolved.includeUsage, true)
@@ -76,7 +90,7 @@ test('sectionSchema: lines carry each dialect production defaults (connection + 
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     maxTokens: DEFAULT_MAX_TOKENS,
     thinkingBudgets: { ...DEFAULT_THINKING_BUDGETS },
-    defaultThinkingBudget: 16384,
+    defaultThinkingBudget: DEFAULT_THINKING_BUDGETS.xhigh,
     summarize: { images: 'strip', keepTurns: 5, toolChars: 2000 },
   })
   assert.equal(resolved.lines.llamacpp.baseURL, DEFAULT_LLAMA_BASE_URL)
@@ -106,7 +120,7 @@ test('sectionSchema: a user-saved line persists over its own defaults', () => {
   assert.equal(resolved.lines.llamacpp.summarize.toolChars, 1000)
   // The untouched line keeps its defaults.
   assert.equal(resolved.lines.ninfer.contextWindow, DEFAULT_CONTEXT_WINDOW)
-  assert.equal(resolved.lines.ninfer.defaultThinkingBudget, 16384)
+  assert.equal(resolved.lines.ninfer.defaultThinkingBudget, DEFAULT_THINKING_BUDGETS.xhigh)
   assert.equal(resolved.lines.omlx.contextWindow, DEFAULT_OMLX_CONTEXT_WINDOW)
   assert.equal(resolved.lines.omlx.maxTokens, DEFAULT_OMLX_MAX_TOKENS)
 })

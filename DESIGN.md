@@ -70,8 +70,9 @@ profile（其 tui profile）有效。
         thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }   # 漏配档位回退 xhigh 值（thinking 开的请求永远带帽）
 ```
 
-四线窗口默认统一 `{262144, 52428}`（输出帽 = ~20% 窗口余量，为 0.8× 压缩触发线
-留头；client `LINE_WINDOW_DEFAULTS` 与 `DEFAULT_*` 常量同源）。其余三线同形状，
+patch 行显式声明各线几何（示例即生产 ninfer 线）。内置新装默认统一 `{131072, 16384}`
+（starter 值，任何本地服务都扛得住；用户按服务端真实 ctx 上调；client `LINE_WINDOW_DEFAULTS`
+与 `DEFAULT_*` 常量同源，§13 的滑杆联动保证任何几何下触发点精确）。其余三线同形状，
 仅 endpoint/model/dialect 不同。
 
 ```yaml
@@ -135,7 +136,7 @@ profile（其 tui profile）有效。
 | `summarizeImages` | `'strip'` | 现有补丁 3 knob 原样（`'strip'\|'keep'`） |
 | `summarizeReasoningKeepTurns` | `5` | `0` = 全剥 |
 | `summarizeToolResultMaxChars` | `2000` | `0` = 不截 |
-| `maxTokens` | `52428` | 摘要帽（= 插件输出帽 ~20% 窗口余量；绕开 preset isolated group 的 8192 死角：后端自持） |
+| `maxTokens` | 该线输出帽（starter `16384`） | 摘要帽 = 插件输出帽（绕开 preset isolated group 的 8192 死角：后端自持；联动几何见 §13） |
 
 ## 5. Wire 映射（多方言分道）
 
@@ -165,9 +166,8 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
     backend.js        # Qwen38CompactionBackend extends compaction-basic（override summarize）
     prepare.js        # summarize 前三裁剪（剥图 / 近 5 轮 reasoning / tool 结果 2000 字帽）
     config.js         # 两半区 schemastery schema + DEFAULT_* 常量
-    setup.js          # boot 自动 setup：qwen38 preset 生成 + default 合并（--src 可选）
     settings-section.js # settings ns 注册（schema/entry/validate，跨字段 fail-loud）
-    client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + summarize 开关）
+    client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + 裁剪旋钮 + 压缩触发滑杆/帽联动）
     client-entry.js / client.css  # client 半区入口 + 样式
   lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行；改 src/client.js 后 scripts/build-client.mjs 重建并提交）
   test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（133 用例）
@@ -240,15 +240,14 @@ maxTokens/thinkingBudgets{low,medium,xhigh}/defaultEffort/thinkingLevelMap/inclu
 summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/env > 内置默认；
 无 settings provider（headless）时行为与 M5 完全一致。测试：settings-section 12
 （schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
-下一 wire body 变）= 76/76。
+下一 wire body 变）。
 
-## 12. 发布态（release，main @ 4cd6f15；M0-M6 全部落地后的现状注记）
+## 12. 发布态（release，v0.3.1 = 本 commit；M0-M6 全部落地后的现状注记）
 
-- **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；窗口默认
-  统一 `{262144, 52428}`；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
-- **boot 自动 setup**：`dsh plugin add` + 重启即生成 **qwen38** preset（standard
-  组成重派生）+ `default: qwen38` 合并（显式默认不动）+ preset.yml 元数据按 locale
-  重渲染（zh/en 标量）；手动 = `setup.js [--src <preset>]`。GUI 选 qwen38 preset。
+- **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；新装默认
+  统一 `{131072, 16384}`（v0.3.1 starter，patch 行按服务端显式覆盖）；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
+- **preset 由 bundle patch 声明**（不再 boot 写盘：老 auto-apply 已退役）：qwen38
+  preset + `default: qwen38` 注册行都随 patch insert，升级同 id 自动接管；GUI 选 qwen38 preset。
 - **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
   值；热加载免重启；zh/en 双语。suite = 133 用例全绿。
@@ -277,17 +276,25 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   undefined → 滑杆/trim 旋钮曾静默失效。修复 = entry-fiber apply() 把活 config 引用发布到
   backend 模块镜像（dispose 以引用相等守卫清理），settingsSection() = 镜像优先（每读 plainConfig
   解 volatile）→ legacy get(NS) → env。教训：rc.2 起插件配置只经 profile 条目 id，不按包 NS。
-- **触发公式**：`min(window×thresholdRatio, window − reserved − headroomTokens)`；qwen38 preset 行
-  `headroomTokens: 0`（stock 65536 会 clamp 触发点），backend 每轮评估把它覆盖为**墙护垫 = 输出上限的
-  1/4**（窄线再夹到剩余预算的 1/4；一步增长的界 = 一次 completion，completion 受输出上限约束）：
-  触发点 = floor(min(pct×W, W−O−O/4))，永远离请求硬墙留一步增长的余量（新工具结果 + 注入上下文，
-  实测单步 6-10K），贴墙挡位（262K/40960 的 84）不再穿墙出 400；滑杆 `compactThresholdPct` **50..99**
-  （floor 50 = 固定开销 + checkpoint 地板之下压缩裁无可裁），上限 client 按线 `(W−O−guard)/W` 现算
-  （同公式镜像，262K/40960 → guard 10240、上限 80），热生效每 step。
+- **触发公式（滑杆=真实触发比例，帽双向联动）**：引擎判定 `floor(min(window×thresholdRatio, window − reserved − headroomTokens))`；
+  qwen38 preset 行 `headroomTokens: 0`（stock 65536 会 clamp 触发点），backend 每轮评估覆盖为**线性墙护** `guard(O) = max(1024, min(O/4, (W−O)/4))`
+  （O=W 输出帽；guard 是帽的安全 wiggle——帽大 guard 大、小窗帽被同步压小 guard 自动小，(W−O)/4 夹保证窄线/畸形配置触发点 ≥ ¾ 预算引擎永不抛错；
+  1024 地板只护极小帽），ratio 直接 = `pct/100`（滑杆就是触发比例）。要让 `pct×W` 精确落地，须 `O + guard(O) = W×(100−pct)/100`，
+  即 `O = floor(W×(100−pct)/125)`——**滑杆 onChange 双向写 maxTokens 到这个同步帽**，两分支恰好相交，**每一格都精确等于 pct%×W**：
+  262K 线 50→帽 104,857/触发 131,072；80→41,943/209,715；83→35,651/217,582（=83.0%）。开环控制:判定尺子=上次请求 meter,
+  guard=判定后增长(工具结果+注入,实测最坏单步 ~23K)的补偿带；pct 越高 guard 越小，超长单步偶触墙时宿主的 context-overflow
+  重触发兜底。滑杆 `compactThresholdPct` UI 固定 50..90（schema 50..99 向后兼容），热生效每 step。
+- **帽联动的红 checker + budget<cap 校验**：同步帽若 < thinking 预算所需 room（`max(thinkingBudgets)+2048`，思考与回答共用帽），
+  该触发点在此几何**根本落不了地**：cap park 在 room、状态区红 checker 点名所需帽值、**保存被拒**，直到调低预算或把滑杆调低。
+  262K 线 xhigh 32768（room 34,816）：pct ≤83 全绿；84 起红（neededCap 33,554），park 34,816 → 有效触发 218,624（83.4%）。
+  校验 fail-closed：`validateSection` 在写入即拒（顶层 + 每线：每个 thinkingBudgets 档与 defaultThinkingBudget 必须严格 <
+  该线 maxTokens），client 保存路径同规则报错（budgetCap 文案）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
+   `defaultThinkingBudget` = 服务端 thinking 上限的**申报值**（不发 wire；room 与校验读它）。仅 ninfer 线在设置页渲染该格
+   （ninfer 无视逐请求预算，真实值只在启动参数里，申报是唯一真相渠道）；其他线三档表全覆盖，字段不渲染、保留存储兼容。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token
   全角 scrub（strata #150 类事故上游已在 0.1.27 修复，scrub 保留护其余引擎）。
 - **定案不做 wire 400 自愈**：上下文 400 的文案每引擎不同（strata `prompt (N tokens) + max tokens (M)
   exceeds the context (C)`、llama.cpp/NInfer/TabbyAPI/oMLX 各自另一套），解析错误文本不可靠；guard
   已在触发层掐死越墙路径，真越墙时宿主的 context-overflow 重触发（引擎无关）兜底。
-- **待办候选（v0.3.x）**：墙护垫比例可调性（现为输出上限 1/4 固定比例）；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
+- **待办候选（v0.3.x）**：guard 系数 1/4 常数的实测校准（读宿主每步注入量，替代拍定系数）；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
   GUI 编辑 patch-declared preset 的存储落点待测。

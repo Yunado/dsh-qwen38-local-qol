@@ -75,10 +75,10 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 |---|---|---|
 | Server | `baseURL`, `model`, `displayName`, `apiKey` (`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`) | `http://localhost:8080/v1` (llama) / `8082` (ninfer) / `8083` (tabbyapi) / `8000` (omlx), model alias, same as `model`, none |
 | Dialect | `dialect` (`DSH_QWEN38_DIALECT`) | `llamacpp` (options: `ninfer`, `tabbyapi`, `omlx`) |
-| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `262144`, `52428` (output cap ≈ 20% of the window, headroom below the compaction trigger) |
-| Thinking | `thinkingBudgets` (llamacpp + tabbyapi + omlx, per effort), `defaultThinkingBudget` (ninfer, headless/env only; the tab shows the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 4096, medium: 8192, xhigh: 16384 }`, `16384`, `medium` |
+| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `131072`, `16384` (starter defaults every local server can host; raise them to your server's real context, and keep the tab at or below what the server was started with) |
+| Thinking | `thinkingBudgets` (llamacpp + tabbyapi + omlx, per effort), `defaultThinkingBudget` (the declared server thinking ceiling; the tab shows it on the ninfer line only — enter the server's `--default-thinking-budget` value there, the plugin cannot read the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 2048, medium: 4096, xhigh: 8192 }`, `8192`, `medium` |
 | Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` (env only) | `strip`, `5`, `2000` |
-| Compaction trigger | `compactThresholdPct` (the tab slider) | `80` (percent of the window where automatic compaction fires; the slider caps at window − output cap) |
+| Compaction trigger | `compactThresholdPct` (the tab slider) | `80` (fires at exactly that percent of the window; the slider syncs the output cap to keep the point reachable) |
 
 ### Settings & Fields Explained
 
@@ -107,7 +107,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 #### 4. History Compaction & Trimming
 When conversations approach the context window limit, Harness compresses older history into summaries:
-- **Compaction trigger point (`compactThresholdPct`)**: percent of the context window where automatic compaction fires (default 80). The tab slider (50..99) is hot, landing on the next session step without a restart, and its cap tracks the window and output inputs minus a wall guard of a quarter of the output cap (the token point shows beside the label). Current usage lives in the chat page's top meter.
+- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must stay strictly below the output cap; the tab refuses the save otherwise. Current usage lives in the chat page's top meter.
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
@@ -224,10 +224,10 @@ DSH 设置 → **Qwen3.8 本地**：
 |---|---|---|
 | 服务器 | `baseURL`、`model`、`displayName`、`apiKey`（`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`） | `http://localhost:8080/v1`（llama）/ `8082`（ninfer）/ `8083`（tabbyapi）/ `8000`（omlx）、模型别名、同 `model`、无 |
 | 方言 | `dialect`（`DSH_QWEN38_DIALECT`） | `llamacpp`（可选：`ninfer`、`tabbyapi`、`omlx`） |
-| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `262144`、`52428`（输出帽 ≈ 窗口的 20%，为压缩触发线留余量） |
-| Thinking | `thinkingBudgets`（llamacpp + tabbyapi + omlx，按 effort）、`defaultThinkingBudget`（ninfer，仅 headless/env；tab 显示启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 4096, medium: 8192, xhigh: 16384 }`、`16384`、`medium` |
+| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `131072`、`16384`（新装起步值，任何本地服务都扛得住；请按服务的真实上下文调大，且设置页不得超过服务启动时设定的上限） |
+| Thinking | `thinkingBudgets`（llamacpp + tabbyapi + omlx，按 effort）、`defaultThinkingBudget`（申报的服务端 thinking 上限；设置页仅在 ninfer 线显示这一格——把服务启动参数 `--default-thinking-budget` 的值填在这里，插件读不到启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 2048, medium: 4096, xhigh: 8192 }`、`8192`、`medium` |
 | Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`（仅环境变量） | `strip`、`5`、`2000` |
-| 压缩触发 | `compactThresholdPct`（tab 滑杆） | `80`（自动压缩触发点 = 窗口 × 该比例；滑杆上限 = 窗口 − 输出上限，自动算） |
+| 压缩触发 | `compactThresholdPct`（tab 滑杆） | `80`（触发点 = 该百分比 × 窗口；滑杆双向联动输出上限，保证该点精确落地） |
 
 ### 设置项与字段说明
 
@@ -256,7 +256,7 @@ DSH 设置 → **Qwen3.8 本地**：
 
 #### 4. 历史压缩与裁剪（Compaction）
 当会话过长接近上下文上限时，Harness 会将较早的历史压缩成摘要：
-- **压缩触发点（`compactThresholdPct`）**：上下文达到 上下文窗口 × 该比例 时自动触发压缩（默认 80%）。设置页滑杆（50 到 99）改完即生效、无需重启，落在下一个会话步骤；滑杆上限按当前线的窗口与输出上限自动计算，并扣除输出上限四分之一的墙护垫（触发点永远离请求硬墙有一步增长的余量），标签旁显示对应的 token 点。当前用量看聊天页顶部的上下文计量。
+- **压缩触发点（`compactThresholdPct`）**：自动压缩恰在窗口的该百分比处触发（滑杆默认 80）。设置页滑杆（50–90 区间）改完即生效、无需重启，落在下一个会话步骤；滑杆同时双向联动输出上限——拖动即重写该帽到"保证该点可落地的最大值"（墙护=帽的 1/4），于是每一格都是精确的真实触发点（标签旁显示对应的 token 点）。若某点所需的帽会低于 thinking 预算所需的容量，帽停在该底线、红字 checker 点出该点需要的帽值，保存被拦，直到手动调低某档预算。每档 thinking 预算（低/中/超高）与默认预算必须严格小于输出上限，否则设置页拒绝保存。当前用量看聊天页顶部的上下文计量。
 - **图片处理（`summarize.images`）**：
   - `strip`（推荐）：在旧轮次中移除大图并替换为简短占位文本，大幅节省上下文空间。
   - `keep`：在历史中保留原图。

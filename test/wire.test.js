@@ -17,6 +17,7 @@ import {
   chatCompletionsUrl,
   scrubControlTokens,
 } from '../src/wire.js'
+import { DEFAULT_THINKING_BUDGETS } from '../src/config.js'
 
 // Build a control-token literal without this source file itself holding one.
 const BAR = String.fromCharCode(124)
@@ -157,10 +158,10 @@ test('buildQwenBody: effort without a configured per-level budget rides the xhig
   // level without its own entry falls back to the xhigh tier value.
   const config = { ...NINFER, thinkingBudgets: { low: 4096 } }
   const body = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', config)
-  assert.equal(body.reasoning_budget_tokens, 16384)
+  assert.equal(body.reasoning_budget_tokens, DEFAULT_THINKING_BUDGETS.xhigh)
   // An entirely absent budgets map caps at the built-in xhigh value too.
   const bare = buildQwenBody({ model: 'qwen', reasoningEffort: 'medium', messages: [] }, 'qwen', { dialect: 'ninfer', includeUsage: false })
-  assert.equal(bare.reasoning_budget_tokens, 16384)
+  assert.equal(bare.reasoning_budget_tokens, DEFAULT_THINKING_BUDGETS.xhigh)
 })
 
 test('buildQwenBody: model falls back to the configured id', () => {

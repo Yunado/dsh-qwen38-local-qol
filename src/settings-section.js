@@ -105,7 +105,7 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets, mark) {
       medium: mark(Schema.number()).default(budgets.medium),
       xhigh: mark(Schema.number()).default(budgets.xhigh),
     }),
-    defaultThinkingBudget: mark(Schema.number()).default(16384),
+    defaultThinkingBudget: mark(Schema.number()).default(DEFAULT_THINKING_BUDGETS.xhigh),
     summarize: Schema.object({
       images: mark(Schema.string()).default(DEFAULT_TRIM_KNOBS.images),
       keepTurns: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.keepTurns),
@@ -142,7 +142,7 @@ function buildSchema(mark) {
       medium: mark(Schema.number()).default(DEFAULT_THINKING_BUDGETS.medium),
       xhigh: mark(Schema.number()).default(DEFAULT_THINKING_BUDGETS.xhigh),
     }),
-    defaultThinkingBudget: mark(Schema.number()).default(16384),
+    defaultThinkingBudget: mark(Schema.number()).default(DEFAULT_THINKING_BUDGETS.xhigh),
     defaultEffort: mark(Schema.string()).default('medium'),
     thinkingLevelMap: mark(Schema.dict(Schema.string())).default({}),
     includeUsage: mark(Schema.boolean()).default(true),
@@ -208,6 +208,20 @@ export function validateSection(value) {
   if (value.defaultThinkingBudget !== undefined && (!Number.isInteger(value.defaultThinkingBudget) || value.defaultThinkingBudget <= 0)) {
     throw new Error(`dsh-qwen38-local-qol: defaultThinkingBudget must be a positive integer, got ${String(value.defaultThinkingBudget)}`)
   }
+  // Preset-style cross check: thinking and answers share the line's output
+  // cap, so every effort budget (and the default) must stay strictly below it.
+  const checkBudgetsFitCap = (cap, budgetMap, defaultBudget, where) => {
+    if (!Number.isInteger(cap) || cap <= 0) return
+    for (const [effort, budgetTokens] of Object.entries(budgetMap)) {
+      if (Number.isInteger(budgetTokens) && budgetTokens >= cap) {
+        throw new Error(`dsh-qwen38-local-qol: ${where}thinkingBudgets["${effort}"] (${String(budgetTokens)}) must stay below the output cap ${String(cap)} (thinking and answers share the cap)`)
+      }
+    }
+    if (Number.isInteger(defaultBudget) && defaultBudget >= cap) {
+      throw new Error(`dsh-qwen38-local-qol: ${where}defaultThinkingBudget (${String(defaultBudget)}) must stay below the output cap ${String(cap)}`)
+    }
+  }
+  checkBudgetsFitCap(value.maxTokens, budgets, value.defaultThinkingBudget, '')
   // The per-line memory carries the same window numbers; validate each line
   // so a hand-edited document cannot park a bad number that later goes live.
   for (const [lineName, line] of Object.entries(value.lines ?? {})) {
@@ -227,6 +241,7 @@ export function validateSection(value) {
     if (lineDefaultBudget !== undefined && (!Number.isInteger(lineDefaultBudget) || lineDefaultBudget <= 0)) {
       throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.defaultThinkingBudget must be a positive integer, got ${String(lineDefaultBudget)}`)
     }
+    checkBudgetsFitCap(line.maxTokens, line.thinkingBudgets ?? {}, lineDefaultBudget, `lines.${lineName}.`)
     const lineImages = line.summarize?.images
     if (lineImages !== undefined && lineImages !== 'strip' && lineImages !== 'keep') {
       throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.images must be "strip" or "keep", got "${lineImages}"`)
