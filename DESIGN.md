@@ -286,6 +286,8 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   （同公式镜像，262K/40960 → guard 10240、上限 80），热生效每 step。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token
   全角 scrub（strata #150 类事故上游已在 0.1.27 修复，scrub 保留护其余引擎）。
-- **待办候选（v0.3.x）**：墙护垫比例可调性（现为输出上限 1/4 固定比例）；wire 层
-  400 自愈（解析服务器报的 prompt tokens，压 max_tokens 单次重试，本轮不炸）；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
+- **定案不做 wire 400 自愈**：上下文 400 的文案每引擎不同（strata `prompt (N tokens) + max tokens (M)
+  exceeds the context (C)`、llama.cpp/NInfer/TabbyAPI/oMLX 各自另一套），解析错误文本不可靠；guard
+  已在触发层掐死越墙路径，真越墙时宿主的 context-overflow 重触发（引擎无关）兜底。
+- **待办候选（v0.3.x）**：墙护垫比例可调性（现为输出上限 1/4 固定比例）；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
   GUI 编辑 patch-declared preset 的存储落点待测。
