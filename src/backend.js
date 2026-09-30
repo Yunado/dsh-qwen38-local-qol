@@ -60,14 +60,16 @@ function settingsSection(ctx) {
 
 /**
  * The live trigger ratio from `compactThresholdPct` (a volatile leaf may
- * arrive wrapped, so unwrap first).
+ * arrive wrapped, so unwrap first). Integers below the 50 floor (left over
+ * from v0.2.0 sliders) clamp up to the floor instead of losing the row.
  * @param ctx - the engine's cordis context.
- * @returns the ratio in (0, 1), or undefined when the section carries no valid value.
+ * @returns the ratio in (0, 1), or undefined when the section carries no integer value.
  */
 function liveThresholdRatio(ctx) {
   const raw = settingsSection(ctx)?.compactThresholdPct
   const pct = raw !== null && typeof raw === 'object' && typeof raw.get === 'function' ? raw.get() : raw
-  return Number.isInteger(pct) && pct >= TRIGGER_PCT_MIN && pct <= TRIGGER_PCT_MAX ? pct / 100 : undefined
+  if (!Number.isInteger(pct)) return undefined
+  return Math.min(TRIGGER_PCT_MAX, Math.max(TRIGGER_PCT_MIN, pct)) / 100
 }
 
 /**

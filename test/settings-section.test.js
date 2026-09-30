@@ -30,7 +30,10 @@ test('sectionSchema: the compaction trigger point defaults to 80 percent', () =>
 })
 
 test('validateSection: an out-of-range compaction trigger fails loud', () => {
-  assert.throws(() => validateSection({ compactThresholdPct: 49 }), /compactThresholdPct/)
+  // 17..49 = legacy v0.2.0 band: accepted at validation (backend clamps to 50).
+  validateSection({ compactThresholdPct: 49 })
+  validateSection({ compactThresholdPct: 17 })
+  assert.throws(() => validateSection({ compactThresholdPct: 16 }), /compactThresholdPct/)
   assert.throws(() => validateSection({ compactThresholdPct: 100 }), /compactThresholdPct/)
   assert.throws(() => validateSection({ compactThresholdPct: 80.5 }), /compactThresholdPct/)
   validateSection({ compactThresholdPct: 50 })
