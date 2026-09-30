@@ -5,9 +5,12 @@
  * - `compactIfNeeded`: before each trigger evaluation, the live
  *   `compactThresholdPct` from the user-settings section (the Settings tab's
  *   slider) becomes the engine's `thresholdRatio`, so moving the slider moves
- *   the next automatic compaction without any restart. The row config keeps
- *   the stock default (0.8 with a zero headroom). Without a settings section
- *   (env layer / bare unit receivers) the row values stand.
+ *   the next automatic compaction without any restart. `headroomTokens`
+ *   always becomes the wall guard (a sixteenth of the line's pressure
+ *   budget, floored at 8192 and capped at a quarter), so even a top-of-slider
+ *   trigger leaves room for one step's growth before the server's
+ *   context-overflow wall. Without a settings section (env layer / bare unit
+ *   receivers) the row's ratio stands and the guard still applies.
  * - `summarize`: the summarizer prefill is trimmed before the one-shot call
  *   (recent reasoning only, images stripped, tool results capped). The trim
  *   keeps the auxiliary call's input bounded so a slow local model does not
@@ -40,6 +43,42 @@ const TRIGGER_PCT_MIN = 50
 const TRIGGER_PCT_MAX = 99
 
 /**
+ * Tokens kept between the highest compaction trigger and the request wall
+ * (`contextWindow - output cap`). A step boundary only measures the last
+ * request; the next one grows by its new tool results and injected context,
+ * so a trigger at the wall itself admits requests the server rejects with a
+ * context-overflow 400. The guard scales with the line: one sixteenth of the
+ * pressure budget, floored at 8192 (a step's growth barely fits below that)
+ * and capped at a quarter of the budget (more would starve the trigger).
+ * Mirrored by the client's slider cap.
+ */
+const WALL_GUARD_TOKENS = 16384
+const WALL_GUARD_MIN_TOKENS = 8192
+
+/** Unwrap one value a volatile leaf may deliver wrapped. */
+function plainValue(value) {
+  return value !== null && typeof value === 'object' && typeof value.get === 'function' ? value.get() : value
+}
+
+/**
+ * The wall guard for the active line: the section mirrors the active line's
+ * `contextWindow` / `maxTokens`, so the guard follows that line's pressure
+ * budget.
+ * @param section - the resolved user-settings section (or undefined).
+ * @returns the token count for the engine config's `headroomTokens`.
+ */
+function wallGuardTokens(section) {
+  const windowTokens = plainValue(section?.contextWindow)
+  const outputTokens = plainValue(section?.maxTokens)
+  if (!Number.isInteger(windowTokens) || windowTokens <= 0
+    || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
+    return WALL_GUARD_TOKENS
+  }
+  const budget = windowTokens - outputTokens
+  return Math.min(Math.max(Math.floor(budget / 16), WALL_GUARD_MIN_TOKENS), Math.floor(budget / 4))
+}
+
+/**
  * The user-settings section, live. The 0.2.0 route: this module's mirror of
  * the plugin row's config, published by the entry fiber (`publishLiveConfig`)
  * and resolved through `plainConfig` per read, so hot commits are seen
@@ -61,12 +100,11 @@ function settingsSection(ctx) {
 /**
  * The live trigger ratio from `compactThresholdPct` (a volatile leaf may
  * arrive wrapped, so unwrap first).
- * @param ctx - the engine's cordis context.
+ * @param section - the resolved user-settings section (or undefined).
  * @returns the ratio in (0, 1), or undefined when the section carries no valid value.
  */
-function liveThresholdRatio(ctx) {
-  const raw = settingsSection(ctx)?.compactThresholdPct
-  const pct = raw !== null && typeof raw === 'object' && typeof raw.get === 'function' ? raw.get() : raw
+function liveThresholdRatio(section) {
+  const pct = plainValue(section?.compactThresholdPct)
   return Number.isInteger(pct) && pct >= TRIGGER_PCT_MIN && pct <= TRIGGER_PCT_MAX ? pct / 100 : undefined
 }
 
@@ -84,11 +122,13 @@ export class QwenLocalCompaction extends BasicCompactionEngine {
   }
 
   /**
-   * Apply the live trigger ratio to the engine config, then delegate: the
-   * pressure decision stays the stock path (`min(window x thresholdRatio,
-   * window - reserved output)`), only the ratio is refreshed per evaluation.
-   * Without a valid live value the row base is restored, so a removed setting
-   * never leaves a stale ratio on the next evaluation.
+   * Apply the live trigger ratio and the wall guard to the engine config,
+   * then delegate: the pressure decision stays the stock path
+   * (`min(window x thresholdRatio, window - reserved output - headroomTokens)`),
+   * with the slider refreshing the ratio and `headroomTokens` holding the
+   * trigger back from the request wall by one step's growth. Without a live
+   * ratio the row base's ratio stands, so a removed setting never leaves a
+   * stale one; the guard applies either way.
    * @param agent - agent whose latest durable routed request is measured.
    * @param trigger - normal step-boundary pressure or context-overflow recovery.
    * @param signal - live turn cancellation signal forwarded to summarization.
@@ -96,8 +136,12 @@ export class QwenLocalCompaction extends BasicCompactionEngine {
    */
   async compactIfNeeded(agent, trigger, signal) {
     const base = this.baseConfig ?? this.config
-    const ratio = liveThresholdRatio(this.ctx)
-    this.config = ratio === undefined ? base : { ...base, thresholdRatio: ratio }
+    const section = settingsSection(this.ctx)
+    const ratio = liveThresholdRatio(section)
+    const guard = wallGuardTokens(section)
+    this.config = ratio === undefined
+      ? { ...base, headroomTokens: guard }
+      : { ...base, thresholdRatio: ratio, headroomTokens: guard }
     return super.compactIfNeeded(agent, trigger, signal)
   }
 

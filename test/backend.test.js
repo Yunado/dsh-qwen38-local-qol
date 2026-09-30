@@ -26,17 +26,33 @@ function engineWith(ctx) {
   return backend
 }
 
-test('backend: compactIfNeeded applies the live compactThresholdPct as the thresholdRatio', async () => {
+test('backend: compactIfNeeded applies the live compactThresholdPct as the thresholdRatio and the wall guard as headroom', async () => {
   const original = BasicCompactionEngine.prototype.compactIfNeeded
   const seen = []
   try {
     BasicCompactionEngine.prototype.compactIfNeeded = async function () {
-      seen.push({ thresholdRatio: this.config.thresholdRatio, maxTokens: this.config.maxTokens, retainRatio: this.config.retainRatio })
+      seen.push({ thresholdRatio: this.config.thresholdRatio, maxTokens: this.config.maxTokens, retainRatio: this.config.retainRatio, headroomTokens: this.config.headroomTokens })
       return null
     }
-    const backend = engineWith(ctxWithSection({ compactThresholdPct: 90 }))
+    const backend = engineWith(ctxWithSection({ compactThresholdPct: 90, contextWindow: 262144, maxTokens: 40960 }))
     await backend.compactIfNeeded('agent', 'pressure', undefined)
-    assert.deepEqual(seen, [{ thresholdRatio: 0.9, maxTokens: 24576, retainRatio: 0.16 }])
+    assert.deepEqual(seen, [{ thresholdRatio: 0.9, maxTokens: 24576, retainRatio: 0.16, headroomTokens: 13824 }])
+  } finally {
+    BasicCompactionEngine.prototype.compactIfNeeded = original
+  }
+})
+
+test('backend: the wall guard shrinks to a quarter of the pressure budget on narrow lines', async () => {
+  const original = BasicCompactionEngine.prototype.compactIfNeeded
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.compactIfNeeded = async function () {
+      seen.push(this.config.headroomTokens)
+      return null
+    }
+    await engineWith(ctxWithSection({ compactThresholdPct: 90, contextWindow: 40000, maxTokens: 20000 })).compactIfNeeded('agent', 'pressure', undefined)
+    await engineWith(ctxWithSection({ compactThresholdPct: 90 })).compactIfNeeded('agent', 'pressure', undefined)
+    assert.deepEqual(seen, [5000, 16384])
   } finally {
     BasicCompactionEngine.prototype.compactIfNeeded = original
   }

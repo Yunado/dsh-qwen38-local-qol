@@ -192,6 +192,28 @@ const LINE_WINDOW_DEFAULTS = Object.freeze({
   omlx: { contextWindow: 262144, maxTokens: 52428 },
 })
 
+/** The backend's wall-guard floor; the guard itself scales with the line (`WALL_GUARD_TOKENS` fallback in backend.js). */
+export const WALL_GUARD_MIN_TOKENS = 8192
+
+/**
+ * The active line's wall guard, mirroring the backend's `wallGuardTokens`:
+ * one sixteenth of the pressure budget (`contextWindow - maxTokens`), floored
+ * at 8192 and capped at a quarter, so the trigger never sits closer to the
+ * request wall than one step's growth (new tool results and injected
+ * context) can reach it.
+ * @param windowTokens - the active line's context window.
+ * @param outputTokens - the active line's output cap.
+ * @returns the guard in tokens.
+ */
+export function compactionWallGuardTokens(windowTokens, outputTokens) {
+  if (!Number.isInteger(windowTokens) || windowTokens <= 0
+    || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
+    return 16384
+  }
+  const budget = windowTokens - outputTokens
+  return Math.min(Math.max(Math.floor(budget / 16), WALL_GUARD_MIN_TOKENS), Math.floor(budget / 4))
+}
+
 /**
  * Read one line's editable record. `fallback` is the section's top-level
  * values, passed only for the active line of a legacy write (the top level
@@ -463,16 +485,22 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   }
   const ninfer = draft.dialect === 'ninfer'
   // Trigger slider geometry: the token point of the current percent and the
-  // percent cap left once the active line's output reservation is subtracted
-  // (recomputed live while the window/output inputs are edited).
+  // percent cap left once the active line's output reservation and the wall
+  // guard are subtracted (recomputed live while the window/output inputs are
+  // edited; matches the engine's floor(min(ratio x window, budget))).
   const windowTokens = /^\d+$/.test(draft.contextWindow) ? Number.parseInt(draft.contextWindow, 10) : 0
   const outputTokens = /^\d+$/.test(draft.maxTokens) ? Number.parseInt(draft.maxTokens, 10) : 0
-  const triggerCapPct = windowTokens > 0 && outputTokens > 0 && outputTokens < windowTokens
-    ? Math.max(50, Math.min(99, Math.floor(((windowTokens - outputTokens) * 100) / windowTokens)))
+  const pressureBudget = windowTokens > 0 && outputTokens >= 0 && windowTokens > outputTokens
+    ? windowTokens - outputTokens - compactionWallGuardTokens(windowTokens, outputTokens)
+    : 0
+  const triggerCapPct = pressureBudget > 0
+    ? Math.max(50, Math.min(99, Math.floor((pressureBudget * 100) / windowTokens)))
     : 99
   const compactPctDraft = /^\d+$/.test(draft.compactPct) ? Number.parseInt(draft.compactPct, 10) : 80
   const compactPctClamped = Math.min(Math.max(50, compactPctDraft), triggerCapPct)
-  const triggerTokens = Math.round((windowTokens * compactPctClamped) / 100)
+  const triggerTokens = pressureBudget > 0
+    ? Math.floor(Math.min((windowTokens * compactPctClamped) / 100, pressureBudget))
+    : Math.round((windowTokens * compactPctClamped) / 100)
   return React.createElement('div', { className: 'qol' },
     React.createElement('h2', { className: 'qol-title' }, t.title),
     state.error !== null

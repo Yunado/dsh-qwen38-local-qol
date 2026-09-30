@@ -278,9 +278,14 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   backend 模块镜像（dispose 以引用相等守卫清理），settingsSection() = 镜像优先（每读 plainConfig
   解 volatile）→ legacy get(NS) → env。教训：rc.2 起插件配置只经 profile 条目 id，不按包 NS。
 - **触发公式**：`min(window×thresholdRatio, window − reserved − headroomTokens)`；qwen38 preset 行
-  `headroomTokens: 0`（stock 65536 会 clamp 触发点）；滑杆 `compactThresholdPct` **50..99**（floor 50 =
-  固定开销 + checkpoint 地板之下压缩裁无可裁），上限 client 按线 `(W−O)/W` 现算，热生效每 step。
+  `headroomTokens: 0`（stock 65536 会 clamp 触发点），backend 每轮评估把它覆盖为**墙护垫 = 压力预算的
+  1/16**（下限 8192、上限预算的 1/4，随窗口伸缩）：触发点 = floor(min(pct×W, W−O−guard))，永远离请求
+  硬墙留一步增长（新工具结果 + 注入上下文，实测单步 6-10K）的余量，贴墙挡位（262K/40960 的 84）
+  不再穿墙出 400；滑杆 `compactThresholdPct` **50..99**（floor 50 = 固定开销 + checkpoint 地板之下压缩
+  裁无可裁），上限 client 按线 `(W−O−guard)/W` 现算（同公式镜像，262K/40960 → guard 13824、上限 79），
+  热生效每 step。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token
   全角 scrub（strata #150 类事故上游已在 0.1.27 修复，scrub 保留护其余引擎）。
-- **待办候选（v0.3.x）**：per-line `headroomTokens`；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
+- **待办候选（v0.3.x）**：墙护垫比例可调性（现为预算 1/16 固定比例 + 双夹子）；wire 层
+  400 自愈（解析服务器报的 prompt tokens，压 max_tokens 单次重试，本轮不炸）；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
   GUI 编辑 patch-declared preset 的存储落点待测。
