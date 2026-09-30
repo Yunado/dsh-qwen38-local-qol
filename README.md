@@ -59,8 +59,6 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (su
 
 DSH settings → **Qwen3.8 Local**:
 
-![server line selector: llama.cpp / NInfer / TabbyAPI / oMLX](<docs/qwen38 server-en.png>)
-
 ![the Qwen3.8 Local settings tab](<docs/qwen38 tab-en.png>)
 
 Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to the profile's plugin config (Cordis patch; hot volatile commits, no restart).
@@ -205,8 +203,6 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（�
 ## 设置 tab
 
 DSH 设置 → **Qwen3.8 本地**：
-
-![服务器线选择器：llama.cpp / NInfer / TabbyAPI / oMLX](<docs/qwen38 server-cn.png>)
 
 ![Qwen3.8 本地设置页](<docs/qwen38 tab-cn.png>)
 
