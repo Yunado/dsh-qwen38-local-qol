@@ -46,7 +46,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (su
 #    not read by the new storage).
 ```
 
-![the qwen38 preset declared by the bundle patch, on the Agent presets page](<docs/qwen38 preset-en.png>)
+![the qwen38 preset declared by the bundle patch, on the Agent presets page](<docs/preset-en.png>)
 
 ## What it supports
 
@@ -59,7 +59,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (su
 
 DSH settings → **Qwen3.8 Local**:
 
-![the Qwen3.8 Local settings tab](<docs/qwen38 tab-en.png>)
+![the Qwen3.8 Local settings tab](<docs/tab-en.png>)
 
 Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to the profile's plugin config (Cordis patch; hot volatile commits, no restart).
 
@@ -191,7 +191,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（�
 #    存储不读旧的 settings.yaml 节）。
 ```
 
-![bundle patch 声明的 qwen38 preset（Agent 预设页）](<docs/qwen38 preset-cn.png>)
+![bundle patch 声明的 qwen38 preset（Agent 预设页）](<docs/preset-cn.png>)
 
 ## 功能特性
 
@@ -204,7 +204,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（�
 
 DSH 设置 → **Qwen3.8 本地**：
 
-![Qwen3.8 本地设置页](<docs/qwen38 tab-cn.png>)
+![Qwen3.8 本地设置页](<docs/tab-cn.png>)
 
 按线记忆（连接、窗口数字、预算、裁剪旋钮）。状态圆点：绿 = `qwen38` 是默认 preset，黄 = 默认是别的 preset，灰 = preset 缺失。改动即时生效并持久化到 profile 的插件配置（Cordis patch，volatile 热提交，无需重启）。
 
