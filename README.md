@@ -14,11 +14,34 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 ```
 
-Restart `dsh web`: at boot the plugin generates the **`qwen38`** user preset from the standard preset's composition, and sets it as the default agent preset when no default is configured. New sessions use it automatically; existing sessions keep the preset they were created with.
+Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.2.0` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it.
+You can also pin a specific release: add a tag to the spec (`#v0.3.0` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it.
 
-![the generated qwen38 preset on the Agent presets page](<docs/qwen38 preset-en.png>)
+## DSH compatibility
+
+| DSH host | Plugin | Status |
+|---|---|---|
+| 0.2.0-rc.2 | `#v0.3.0` | tested (production) |
+| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.0` | should work - same seam batch, not exercised |
+| 0.1.6-alpha.2 and older | `#v0.2.0` | supported line |
+
+`main` targets the rc.2 seam batch; stay on `#v0.2.0` with older hosts.
+
+Upgrading from v0.2.0 (host first, then plugin):
+
+```sh
+# 1) update the DSH host to 0.2.0-rc.2 or newer (normal host update).
+# 2) re-pin the plugin (profile dir; Windows: %USERPROFILE%\.dsh\profiles\web):
+cd ~/.dsh/profiles/web
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.0'
+pnpm install
+rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
+# 3) restart dsh web, then Settings -> Qwen3.8 Local: fill the line config once
+#    (the old settings.yaml section is not read by the new storage).
+```
+
+![the qwen38 preset declared by the bundle patch, on the Agent presets page](<docs/qwen38 preset-en.png>)
 
 ## What it supports
 
@@ -35,7 +58,7 @@ DSH settings → **Qwen3.8 Local**:
 
 ![the Qwen3.8 Local settings tab](<docs/qwen38 tab-en.png>)
 
-Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to `settings.yaml` (hot-reloaded).
+Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to the profile's plugin config (Cordis patch; hot volatile commits, no restart).
 
 ## What can be tuned
 
@@ -45,7 +68,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 |---|---|---|
 | Server | `baseURL`, `model`, `displayName`, `apiKey` (`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`) | `http://localhost:8080/v1` (llama) / `8082` (ninfer) / `8083` (tabbyapi) / `8000` (omlx), model alias, same as `model`, none |
 | Dialect | `dialect` (`DSH_QWEN38_DIALECT`) | `llamacpp` (options: `ninfer`, `tabbyapi`, `omlx`) |
-| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `262144`, `52428` (output cap ≈ 20% of the window, headroom for the compaction trigger at 0.8×) |
+| Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `262144`, `52428` (output cap ≈ 20% of the window, headroom below the compaction trigger) |
 | Thinking | `thinkingBudgets` (llamacpp + tabbyapi + omlx, per effort), `defaultThinkingBudget` (ninfer, headless/env only; the tab shows the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 4096, medium: 8192, xhigh: 16384 }`, `16384`, `medium` |
 | Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` (env only) | `strip`, `5`, `2000` |
 | Compaction trigger | `compactThresholdPct` (the tab slider) | `80` (percent of the window where automatic compaction fires; the slider caps at window − output cap) |
@@ -101,14 +124,12 @@ The settings tab keeps independent settings for each dialect (`llamacpp`, `omlx`
 dsh plugin --profile web update dsh-qwen38-local-qol
 ```
 
-`github:` dependencies resolve to an exact commit. If the profile lockfile still pins the commit first installed, remove and re-add the plugin to force re-resolution. Updates never touch the generated preset or the settings section.
+`github:` dependencies resolve to an exact commit. If the profile lockfile still pins the commit first installed, edit the spec (a newer `#tag`, or drop the fragment to track main) and re-run `pnpm install` in the profile directory. Updates never touch the declared preset or the settings section.
 
 ## Uninstall
 
 1. `dsh plugin --profile web remove dsh-qwen38-local-qol`
-2. Delete the **`qwen38`** preset on the Agent presets page.
-3. Drop `agent-presets: { default: qwen38 }` from `~/.dsh/settings.yaml`.
-4. Restart DSH.
+2. Restart `dsh web` - the qwen38 preset declaration and its default ride the plugin's bundle patch, so both disappear with it.
 
 Session history, transcripts, model lines and engines are not state the plugin owns.
 
@@ -136,11 +157,34 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol
 ```
 
-重启 `dsh web`：启动时插件从 standard preset 的组成生成 **`qwen38`** 用户 preset，且未配置默认时将其设为默认 agent preset。新会话自动使用；已有会话保留创建时的 preset。
+重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.2.0` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.0` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。
 
-![生成的 qwen38 预设（Agent 预设页）](<docs/qwen38 preset-cn.png>)
+## DSH 兼容性
+
+| DSH 宿主 | 插件版本 | 状态 |
+|---|---|---|
+| 0.2.0-rc.2 | `#v0.3.0` | 实测通过（生产） |
+| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.0` | 应可用 - 同一批缝，未实测 |
+| 0.1.6-alpha.2 及更早 | `#v0.2.0` | 支持线 |
+
+`main` 已面向 rc.2 缝批次；老宿主请钉 `#v0.2.0`。
+
+从 v0.2.0 升级（先升宿主，再升插件）：
+
+```sh
+# 1) 先把 DSH 宿主升到 0.2.0-rc.2 或更新（正常宿主更新）。
+# 2) 重钉插件（profile 目录；Windows：%USERPROFILE%\.dsh\profiles\web）：
+cd ~/.dsh/profiles/web
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.0'
+pnpm install
+rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
+# 3) 重启 dsh web，然后 设置 -> Qwen3.8 本地：把线的配置填一遍
+#    （新的 profile 配置存储不读旧的 settings.yaml 节）。
+```
+
+![bundle patch 声明的 qwen38 preset（Agent 预设页）](<docs/qwen38 preset-cn.png>)
 
 ## 功能特性
 
@@ -157,7 +201,7 @@ DSH 设置 → **Qwen3.8 本地**：
 
 ![Qwen3.8 本地设置页](<docs/qwen38 tab-cn.png>)
 
-按线记忆（连接、窗口数字、预算、裁剪旋钮）。状态圆点：绿 = `qwen38` 是默认 preset，黄 = 默认是别的 preset，灰 = preset 缺失。改动即时生效并持久化到 `settings.yaml`（热加载）。
+按线记忆（连接、窗口数字、预算、裁剪旋钮）。状态圆点：绿 = `qwen38` 是默认 preset，黄 = 默认是别的 preset，灰 = preset 缺失。改动即时生效并持久化到 profile 的插件配置（Cordis patch，volatile 热提交，无需重启）。
 
 ## 可调项
 
@@ -167,7 +211,7 @@ DSH 设置 → **Qwen3.8 本地**：
 |---|---|---|
 | 服务器 | `baseURL`、`model`、`displayName`、`apiKey`（`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`） | `http://localhost:8080/v1`（llama）/ `8082`（ninfer）/ `8083`（tabbyapi）/ `8000`（omlx）、模型别名、同 `model`、无 |
 | 方言 | `dialect`（`DSH_QWEN38_DIALECT`） | `llamacpp`（可选：`ninfer`、`tabbyapi`、`omlx`） |
-| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `262144`、`52428`（输出帽 ≈ 窗口的 20%，为 0.8× 压缩触发线留余量） |
+| 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `262144`、`52428`（输出帽 ≈ 窗口的 20%，为压缩触发线留余量） |
 | Thinking | `thinkingBudgets`（llamacpp + tabbyapi + omlx，按 effort）、`defaultThinkingBudget`（ninfer，仅 headless/env；tab 显示启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 4096, medium: 8192, xhigh: 16384 }`、`16384`、`medium` |
 | Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`（仅环境变量） | `strip`、`5`、`2000` |
 | 压缩触发 | `compactThresholdPct`（tab 滑杆） | `80`（自动压缩触发点 = 窗口 × 该比例；滑杆上限 = 窗口 − 输出上限，自动算） |
@@ -221,14 +265,12 @@ DSH 设置 → **Qwen3.8 本地**：
 dsh plugin --profile web update dsh-qwen38-local-qol
 ```
 
-`github:` 依赖按精确 commit 解析。若 profile 锁文件仍钉在首次安装时的 commit，remove 后重新 add 插件即可强制重新解析。更新不触碰生成的 preset 与设置节。
+`github:` 依赖按精确 commit 解析。若 profile 锁文件仍钉在首次安装时的 commit，改 spec（更新的 `#tag`，或去掉 fragment 跟随 main）后在 profile 目录重跑 `pnpm install`。更新不触碰声明的 preset 与设置节。
 
 ## 卸载
 
 1. `dsh plugin --profile web remove dsh-qwen38-local-qol`
-2. 在 Agent 预设页删除 **`qwen38`** preset。
-3. `~/.dsh/settings.yaml` 删掉 `agent-presets: { default: qwen38 }`。
-4. 重启 DSH。
+2. 重启 `dsh web` —— qwen38 preset 声明与默认都挂在插件的 bundle patch 上，随插件一起消失。
 
 会话历史、transcript、模型线、引擎都不是插件持有的状态。
 

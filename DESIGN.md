@@ -44,6 +44,10 @@ DSH 插件契约（cookbook `adding-a-package.md`）：plugin = `name/inject/app
 
 ### 挂载（M0 判定后定稿。web profile 的 compaction 活体在 per-session preset，profile patch 够不着）
 
+> **[已被 §13 取代]** 0.2.0-rc.2 起 agent preset 可被 bundle patch 直接声明：
+> qwen38 preset（roster + compaction 行 + registry default）= `presets/qwen38.patch.yml`，
+> boot 零写盘，setup 脚本退役。下面 M0 时代的目录生成方案保留作历史。
+
 **M0 证据**（dump + 源码）：web profile root 层的 compaction 行（compaction-basic /
 command-compact / tool-result-pruner）全被 dsh-web-app 补丁 `disabled: true`；
 真正压缩 = standard agent preset 的 isolated group（preset 文件按原样 standing
@@ -216,6 +220,10 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
 
 ## 11. M6：设置 tab（配置全进 UI，2026-09）
 
+> **[部分被 §13 取代]** rc.2 移除了 `SettingsProvider.installSection` 与
+> `settings.get(ns)` 活读缝：设置存储迁到 profile 插件配置（Cordis patch +
+> volatile 热提交），backend 经 entry-fiber 模块镜像读活配置。本节保留作 0.1.x 史。
+
 用户诉求：设置里新一个 tab：**选 llama or ninfer** + 全参数表单（effort 预算 =
 "reasoning effort 单独的 cap" + compaction 旋钮 + baseURL/model 等）。参考
 样板 = dsh-ads（外部插件 client 半区 + settings.section 槽）。源码验证后的缝：
@@ -254,3 +262,25 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 - **遗留**（与 §10 一致）：GUI 内置 effort picker 不显示插件线（composer 无选项，
   配置默认值兜底）；TabbyAPI/oMLX 线 vision token 计价未钉（请求正常，仅预检容量
   投影缺失）；preset 缝 web-surface only（headless profile 仍走 core patch 路线）。
+
+## 13. v0.3.x 发布态（DSH 0.2.0-rc.2 适配，2026-09-30）
+
+- **兼容声明**：tested = 0.2.0-rc.2（生产）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
+  ≤0.1.6-alpha.2 钉 v0.2.0。peer 钉 `^0.2.0-rc.2`；main 面向 rc.2 线。
+- **preset 全声明化**：`presets/qwen38.patch.yml`（bundle patch list 第二件）声明完整 roster、
+  卡片文案（rc.2 单串双语 "A / B"）、registry default。setup.js/`~/.dsh/.agent-presets` 生成链退役
+  （v0.2.0 用户升级后旧目录惰性无害，可删）。
+- **设置存储迁移**：真身 = profile 插件配置（Cordis patch + volatile 热提交）；client 读写
+  `ctx.remote.settings.describe()/update(ns='qwen38'/*profile entry id*/, patch, revision)`；
+  apply(ctx,config) 收到的是每个 .volatile() 叶子包成的 cosmokit 只读引用（plainConfig 解包）。
+- **compaction 活读修复（v0.3.0 核心 fix）**：rc.2 的 SettingsForms 无 `get(ns)`，旧缝读恒
+  undefined → 滑杆/trim 旋钮曾静默失效。修复 = entry-fiber apply() 把活 config 引用发布到
+  backend 模块镜像（dispose 以引用相等守卫清理），settingsSection() = 镜像优先（每读 plainConfig
+  解 volatile）→ legacy get(NS) → env。教训：rc.2 起插件配置只经 profile 条目 id，不按包 NS。
+- **触发公式**：`min(window×thresholdRatio, window − reserved − headroomTokens)`；qwen38 preset 行
+  `headroomTokens: 0`（stock 65536 会 clamp 触发点）；滑杆 `compactThresholdPct` **50..99**（floor 50 =
+  固定开销 + checkpoint 地板之下压缩裁无可裁），上限 client 按线 `(W−O)/W` 现算，热生效每 step。
+- **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token
+  全角 scrub（strata #150 类事故上游已在 0.1.27 修复，scrub 保留护其余引擎）。
+- **待办候选（v0.3.x）**：per-line `headroomTokens`；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；
+  GUI 编辑 patch-declared preset 的存储落点待测。
