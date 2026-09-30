@@ -6,11 +6,11 @@
  *   `compactThresholdPct` from the user-settings section (the Settings tab's
  *   slider) becomes the engine's `thresholdRatio`, so moving the slider moves
  *   the next automatic compaction without any restart. `headroomTokens`
- *   always becomes the wall guard (a sixteenth of the line's pressure
- *   budget, floored at 8192 and capped at a quarter), so even a top-of-slider
- *   trigger leaves room for one step's growth before the server's
- *   context-overflow wall. Without a settings section (env layer / bare unit
- *   receivers) the row's ratio stands and the guard still applies.
+ *   always becomes the wall guard (a quarter of the line's output cap), so
+ *   even a top-of-slider trigger sits at `window - output - output/4`,
+ *   leaving room for one step's growth before the server's context-overflow
+ *   wall. Without a settings section (env layer / bare unit receivers) the
+ *   row's ratio stands and the guard still applies.
  * - `summarize`: the summarizer prefill is trimmed before the one-shot call
  *   (recent reasoning only, images stripped, tool results capped). The trim
  *   keeps the auxiliary call's input bounded so a slow local model does not
@@ -45,15 +45,14 @@ const TRIGGER_PCT_MAX = 99
 /**
  * Tokens kept between the highest compaction trigger and the request wall
  * (`contextWindow - output cap`). A step boundary only measures the last
- * request; the next one grows by its new tool results and injected context,
- * so a trigger at the wall itself admits requests the server rejects with a
- * context-overflow 400. The guard scales with the line: one sixteenth of the
- * pressure budget, floored at 8192 (a step's growth barely fits below that)
- * and capped at a quarter of the budget (more would starve the trigger).
- * Mirrored by the client's slider cap.
+ * request; the next one grows by up to one completion (bounded by the output
+ * cap) plus its tool results and injected context, so a trigger at the wall
+ * itself admits requests the server rejects with a context-overflow 400. The
+ * guard is a quarter of the line's output cap, so the top trigger sits at
+ * `window - output - output/4`; a narrow window shrinks it to a quarter of
+ * the remaining budget. Mirrored by the client's slider cap.
  */
 const WALL_GUARD_TOKENS = 16384
-const WALL_GUARD_MIN_TOKENS = 8192
 
 /** Unwrap one value a volatile leaf may deliver wrapped. */
 function plainValue(value) {
@@ -62,8 +61,7 @@ function plainValue(value) {
 
 /**
  * The wall guard for the active line: the section mirrors the active line's
- * `contextWindow` / `maxTokens`, so the guard follows that line's pressure
- * budget.
+ * `contextWindow` / `maxTokens`, so the guard follows that line.
  * @param section - the resolved user-settings section (or undefined).
  * @returns the token count for the engine config's `headroomTokens`.
  */
@@ -74,8 +72,7 @@ function wallGuardTokens(section) {
     || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
     return WALL_GUARD_TOKENS
   }
-  const budget = windowTokens - outputTokens
-  return Math.min(Math.max(Math.floor(budget / 16), WALL_GUARD_MIN_TOKENS), Math.floor(budget / 4))
+  return Math.min(Math.floor(outputTokens / 4), Math.floor((windowTokens - outputTokens) / 4))
 }
 
 /**

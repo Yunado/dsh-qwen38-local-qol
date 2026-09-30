@@ -343,11 +343,10 @@ test('toDraft: an omlx-active section lifts the MLX line onto the inputs', () =>
 })
 
 test('compactionWallGuardTokens mirrors the backend guard and its clamps', () => {
-  assert.equal(client.WALL_GUARD_MIN_TOKENS, 8192)
-  // Proportional: a sixteenth of the pressure budget.
-  assert.equal(client.compactionWallGuardTokens(262144, 40960), 13824)
+  // A quarter of the output cap is the guard.
+  assert.equal(client.compactionWallGuardTokens(262144, 40960), 10240)
   assert.equal(client.compactionWallGuardTokens(262144, 52428), 13107)
-  // Narrow line: the floor (8192) would eat more than a quarter of the budget, so the quarter cap wins.
+  // Narrow line: a quarter of the remaining budget caps the guard.
   assert.equal(client.compactionWallGuardTokens(40000, 20000), 5000)
   // Degenerate geometry falls back to the backend constant.
   assert.equal(client.compactionWallGuardTokens(0, 0), 16384)

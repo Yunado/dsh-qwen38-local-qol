@@ -107,7 +107,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 #### 4. History Compaction & Trimming
 When conversations approach the context window limit, Harness compresses older history into summaries:
-- **Compaction trigger point (`compactThresholdPct`)**: percent of the context window where automatic compaction fires (default 80). The tab slider (50..99) is hot, landing on the next session step without a restart, and its cap tracks the window and output inputs minus a wall guard of one sixteenth of that budget (the token point shows beside the label). Current usage lives in the chat page's top meter.
+- **Compaction trigger point (`compactThresholdPct`)**: percent of the context window where automatic compaction fires (default 80). The tab slider (50..99) is hot, landing on the next session step without a restart, and its cap tracks the window and output inputs minus a wall guard of a quarter of the output cap (the token point shows beside the label). Current usage lives in the chat page's top meter.
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
@@ -256,7 +256,7 @@ DSH 设置 → **Qwen3.8 本地**：
 
 #### 4. 历史压缩与裁剪（Compaction）
 当会话过长接近上下文上限时，Harness 会将较早的历史压缩成摘要：
-- **压缩触发点（`compactThresholdPct`）**：上下文达到 上下文窗口 × 该比例 时自动触发压缩（默认 80%）。设置页滑杆（50 到 99）改完即生效、无需重启，落在下一个会话步骤；滑杆上限按当前线的窗口与输出上限自动计算，并扣除该预算十六分之一的墙护垫（触发点永远离请求硬墙有一步增长的余量），标签旁显示对应的 token 点。当前用量看聊天页顶部的上下文计量。
+- **压缩触发点（`compactThresholdPct`）**：上下文达到 上下文窗口 × 该比例 时自动触发压缩（默认 80%）。设置页滑杆（50 到 99）改完即生效、无需重启，落在下一个会话步骤；滑杆上限按当前线的窗口与输出上限自动计算，并扣除输出上限四分之一的墙护垫（触发点永远离请求硬墙有一步增长的余量），标签旁显示对应的 token 点。当前用量看聊天页顶部的上下文计量。
 - **图片处理（`summarize.images`）**：
   - `strip`（推荐）：在旧轮次中移除大图并替换为简短占位文本，大幅节省上下文空间。
   - `keep`：在历史中保留原图。

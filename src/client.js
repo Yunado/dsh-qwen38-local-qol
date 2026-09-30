@@ -192,15 +192,11 @@ const LINE_WINDOW_DEFAULTS = Object.freeze({
   omlx: { contextWindow: 262144, maxTokens: 52428 },
 })
 
-/** The backend's wall-guard floor; the guard itself scales with the line (`WALL_GUARD_TOKENS` fallback in backend.js). */
-export const WALL_GUARD_MIN_TOKENS = 8192
-
 /**
  * The active line's wall guard, mirroring the backend's `wallGuardTokens`:
- * one sixteenth of the pressure budget (`contextWindow - maxTokens`), floored
- * at 8192 and capped at a quarter, so the trigger never sits closer to the
- * request wall than one step's growth (new tool results and injected
- * context) can reach it.
+ * a quarter of the output cap (one step's growth is bounded by one
+ * completion), shrunk to a quarter of the remaining budget on narrow lines,
+ * so the trigger never sits closer to the request wall than that.
  * @param windowTokens - the active line's context window.
  * @param outputTokens - the active line's output cap.
  * @returns the guard in tokens.
@@ -210,8 +206,7 @@ export function compactionWallGuardTokens(windowTokens, outputTokens) {
     || !Number.isInteger(outputTokens) || outputTokens < 0 || windowTokens <= outputTokens) {
     return 16384
   }
-  const budget = windowTokens - outputTokens
-  return Math.min(Math.max(Math.floor(budget / 16), WALL_GUARD_MIN_TOKENS), Math.floor(budget / 4))
+  return Math.min(Math.floor(outputTokens / 4), Math.floor((windowTokens - outputTokens) / 4))
 }
 
 /**

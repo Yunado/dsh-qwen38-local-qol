@@ -36,7 +36,7 @@ test('backend: compactIfNeeded applies the live compactThresholdPct as the thres
     }
     const backend = engineWith(ctxWithSection({ compactThresholdPct: 90, contextWindow: 262144, maxTokens: 40960 }))
     await backend.compactIfNeeded('agent', 'pressure', undefined)
-    assert.deepEqual(seen, [{ thresholdRatio: 0.9, maxTokens: 24576, retainRatio: 0.16, headroomTokens: 13824 }])
+    assert.deepEqual(seen, [{ thresholdRatio: 0.9, maxTokens: 24576, retainRatio: 0.16, headroomTokens: 10240 }])
   } finally {
     BasicCompactionEngine.prototype.compactIfNeeded = original
   }
