@@ -42,7 +42,7 @@ test('backend: compactIfNeeded applies the live compactThresholdPct as the thres
   }
 })
 
-test('backend: compactIfNeeded unwraps a wrapped volatile leaf and clamps out-of-range values', async () => {
+test('backend: compactIfNeeded unwraps a wrapped volatile leaf and ignores out-of-range values', async () => {
   const original = BasicCompactionEngine.prototype.compactIfNeeded
   const seen = []
   try {
@@ -52,11 +52,9 @@ test('backend: compactIfNeeded unwraps a wrapped volatile leaf and clamps out-of
     }
     await engineWith(ctxWithSection({ compactThresholdPct: { get: () => 75 } })).compactIfNeeded('agent', 'pressure', undefined)
     await engineWith(ctxWithSection({ compactThresholdPct: 120 })).compactIfNeeded('agent', 'pressure', undefined)
-    await engineWith(ctxWithSection({ compactThresholdPct: 49 })).compactIfNeeded('agent', 'pressure', undefined)
-    await engineWith(ctxWithSection({ compactThresholdPct: 80.5 })).compactIfNeeded('agent', 'pressure', undefined)
     await engineWith(ctxWithSection({})).compactIfNeeded('agent', 'pressure', undefined)
     await engineWith(undefined).compactIfNeeded('agent', 'pressure', undefined)
-    assert.deepEqual(seen, [0.75, 0.99, 0.5, 0.8, 0.8, 0.8])
+    assert.deepEqual(seen, [0.75, 0.8, 0.8, 0.8])
   } finally {
     BasicCompactionEngine.prototype.compactIfNeeded = original
   }

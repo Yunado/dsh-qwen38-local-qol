@@ -256,13 +256,10 @@ export function validateSection(value) {
   // The status fields ride the legacy section base only; a 0.2.0 Config has
   // none. Validate them when present so a hand-edited legacy document cannot
   // park junk the old tab would render.
-  // 17..49 is the legacy v0.2.0 slider band: accepted so an upgraded profile
-  // boots, and the compaction backend clamps those values to the 50 floor at
-  // use; the settings tab never writes below 50.
   if (value.compactThresholdPct !== undefined
     && (!Number.isInteger(value.compactThresholdPct)
-      || value.compactThresholdPct < 17 || value.compactThresholdPct > 99)) {
-    throw new Error(`dsh-qwen38-local-qol: compactThresholdPct must be an integer 17..99 (values under 50 clamp to 50), got ${String(value.compactThresholdPct)}`)
+      || value.compactThresholdPct < 50 || value.compactThresholdPct > 99)) {
+    throw new Error(`dsh-qwen38-local-qol: compactThresholdPct must be an integer 50..99, got ${String(value.compactThresholdPct)}`)
   }
   if (value.compaction !== undefined) {
     if (typeof value.compaction?.presetGenerated !== 'boolean') {
