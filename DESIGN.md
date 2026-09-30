@@ -280,8 +280,6 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 - **触发公式**：`min(window×thresholdRatio, window − reserved − headroomTokens)`；qwen38 preset 行
   `headroomTokens: 0`（stock 65536 会 clamp 触发点）；滑杆 `compactThresholdPct` **50..99**（floor 50 =
   固定开销 + checkpoint 地板之下压缩裁无可裁），上限 client 按线 `(W−O)/W` 现算，热生效每 step。
-  校验层放行 **17..99**（rc.2 移植期未钉 tag 的 main 存过 <50 的值；v0.2.0 无滑杆），
-  backend 使用层把整数 clamp 进 50..99，升级 boot 不炸。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token
   全角 scrub（strata #150 类事故上游已在 0.1.27 修复，scrub 保留护其余引擎）。
 - **待办候选（v0.3.x）**：per-line `headroomTokens`；0.1.7-alpha 线实测升格兼容行 + dsh.so 矩阵刷新；

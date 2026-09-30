@@ -60,9 +60,8 @@ function settingsSection(ctx) {
 
 /**
  * The live trigger ratio from `compactThresholdPct` (a volatile leaf may
- * arrive wrapped, so unwrap first). Integers below the 50 floor (stored by
- * the 0.2.0-rc.2 port window's 17..99 slider) clamp up to the floor instead
- * of losing the row.
+ * arrive wrapped, so unwrap first). Integers below the 50 floor (left over
+ * from v0.2.0 sliders) clamp up to the floor instead of losing the row.
  * @param ctx - the engine's cordis context.
  * @returns the ratio in (0, 1), or undefined when the section carries no integer value.
  */

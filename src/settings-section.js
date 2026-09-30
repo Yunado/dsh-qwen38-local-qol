@@ -256,10 +256,9 @@ export function validateSection(value) {
   // The status fields ride the legacy section base only; a 0.2.0 Config has
   // none. Validate them when present so a hand-edited legacy document cannot
   // park junk the old tab would render.
-  // 17..49 predates the 50 floor: the 0.2.0-rc.2 port window (untagged main)
-  // shipped a 17..99 slider, and those stored values must still boot; the
-  // compaction backend clamps them to the 50 floor at use, and the settings
-  // tab never writes below 50.
+  // 17..49 is the legacy v0.2.0 slider band: accepted so an upgraded profile
+  // boots, and the compaction backend clamps those values to the 50 floor at
+  // use; the settings tab never writes below 50.
   if (value.compactThresholdPct !== undefined
     && (!Number.isInteger(value.compactThresholdPct)
       || value.compactThresholdPct < 17 || value.compactThresholdPct > 99)) {
