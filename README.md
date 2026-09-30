@@ -10,7 +10,7 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 
 - **Model support**: Qwen3.8-27B · Qwen3.8-Flash-Next
 - **Serving engines**: llama.cpp `llama-server` · NInfer · TabbyAPI (ExLlamaV3) · oMLX (Apple Silicon MLX)
-- **Note**: the llama.cpp lane is the standard OpenAI-compatible `/v1` API - any server speaking it is expected to work there (Strata, OnSloth Desktop, LM Studio).
+- **Note**: the llama.cpp lane is the standard OpenAI-compatible `/v1` API - any server speaking it is expected to work there (Strata, Unsloth Desktop, LM Studio).
 
 ## Install
 
@@ -160,7 +160,7 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 
 - **模型支持**：Qwen3.8-27B · Qwen3.8-Flash-Next
 - **推理引擎**：llama.cpp `llama-server` · NInfer · TabbyAPI（ExLlamaV3）· oMLX（Apple Silicon MLX）
-- **注**：llama.cpp 线即标准 OpenAI 兼容 `/v1` API，任何说这套协议的服务器预期都能走这条线（Strata、OnSloth Desktop、LM Studio）。
+- **注**：llama.cpp 线即标准 OpenAI 兼容 `/v1` API，任何说这套协议的服务器预期都能走这条线（Strata、Unsloth Desktop、LM Studio）。
 
 ## 安装
 
