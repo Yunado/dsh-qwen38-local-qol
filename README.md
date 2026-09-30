@@ -6,7 +6,7 @@
 
 [![dsh.so risk](https://www.dsh.so/badge/dsh-qwen38-local-qol.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.6-alpha.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.6-alpha.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/) · [![dsh.so install · dsh 0.1.5-rc.2](https://www.dsh.so/badge/install/dsh-qwen38-local-qol@0.1.5-rc.2.svg)](https://www.dsh.so/artifact/dsh-qwen38-local-qol/)
 
-A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) for running **Qwen3.8 locally** (llama.cpp `llama-server`, NInfer, TabbyAPI (the ExLlamaV3 backend server), or oMLX (Apple Silicon MLX inference server); all serve the OpenAI-compatible `/v1` API). **Qwen3.8-Flash-Next** works on the llama.cpp line. No core patches, no pi-ai patchfile.
+A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) for running **Qwen3.8 locally**, with first-class support for **Qwen3.8-27B** and **Qwen3.8-Flash-Next**. Engines: llama.cpp `llama-server`, NInfer, TabbyAPI (the ExLlamaV3 backend server), and oMLX (Apple Silicon MLX inference server) - all serve the OpenAI-compatible `/v1` API. Because the llama.cpp lane is plain `/v1`, any llama.cpp-based server works on it too: **Strata, OnSloth Desktop, LM Studio**. No core patches, no pi-ai patchfile.
 
 ## Install
 
@@ -152,7 +152,7 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 
 ## 中文
 
-给**本地跑 Qwen3.8** 的人用的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）QoL 插件（llama.cpp `llama-server`、NInfer、TabbyAPI（ExLlamaV3 后端服务器），或 oMLX（Apple Silicon MLX 推理后端）；均提供 OpenAI 兼容 `/v1` API）。**Qwen3.8-Flash-Next** 走 llama.cpp 线即可用。零核心补丁、零 pi-ai 补丁文件。
+给**本地跑 Qwen3.8** 的人用的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）QoL 插件，**Qwen3.8-27B** 与 **Qwen3.8-Flash-Next** 均为一等支持。推理引擎：llama.cpp `llama-server`、NInfer、TabbyAPI（ExLlamaV3 后端服务器）、oMLX（Apple Silicon MLX 推理后端）——均提供 OpenAI 兼容 `/v1` API。llama.cpp 线就是标准 `/v1`，所以任何基于 llama.cpp 的服务器都能走这条线：**Strata、OnSloth Desktop、LM Studio**。零核心补丁、零 pi-ai 补丁文件。
 
 ## 安装
 
