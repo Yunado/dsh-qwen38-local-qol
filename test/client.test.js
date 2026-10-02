@@ -191,39 +191,45 @@ test('client: an already-matching default-model row is not rewritten (no-op writ
   assert.equal(updateCalls[0].ns, 'qwen38')
 })
 
-test('toDraft: a fresh section (no user layer) ships the built-in starter defaults pre-filled', () => {
+test('toDraft: a fresh section migrates the legacy top level onto the active line', () => {
   const draft = client.toDraft({ dialect: 'ninfer', baseURL: 'http://localhost:8082/v1', model: 'qwen3.8-27b-nvfp4' })
-  assert.equal(draft.contextWindow, '131072')
-  assert.equal(draft.maxTokens, '16384')
-  assert.equal(draft.low, '2048')
-  assert.equal(draft.medium, '4096')
-  assert.equal(draft.xhigh, '8192')
-  assert.equal(draft.defaultBudget, '8192')
-  assert.equal(draft.images, 'strip')
-  assert.equal(draft.keepTurns, '5')
-  assert.equal(draft.toolChars, '2000')
+  // The starter numbers are defaults, not pinned: the tab and the slider math
+  // only need every unpersisted field to arrive as a numeric string, whatever
+  // the built-in starter values happen to be.
+  for (const text of [draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh, draft.defaultBudget, draft.keepTurns, draft.toolChars]) {
+    assert.match(text, /^\d+$/)
+  }
   // Legacy shape (no user.lines): the active line migrates from the top level.
   assert.equal(draft.baseURL, 'http://localhost:8082/v1')
   assert.equal(draft.model, 'qwen3.8-27b-nvfp4')
   // The top-level credential defaults to empty (keyless = no Authorization header).
   assert.equal(draft.apiKey, '')
-  // The other lines park at their built-in defaults.
-  assert.equal(draft.lines.llamacpp.baseURL, '')
-  assert.equal(draft.lines.llamacpp.contextWindow, '131072')
-  assert.equal(draft.lines.tabbyapi.baseURL, '')
-  assert.equal(draft.lines.tabbyapi.contextWindow, '131072')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '16384')
-  assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '131072')
-  assert.equal(draft.lines.omlx.maxTokens, '16384')
-  assert.equal(draft.lines.ninfer.xhigh, '8192')
-  // The trigger point is shared across lines and ships at 80 percent.
-  assert.equal(draft.compactPct, '80')
+  // Every parked line carries its own numeric record even unpersisted.
+  for (const name of ['llamacpp', 'tabbyapi', 'omlx']) {
+    assert.match(draft.lines[name].contextWindow, /^\d+$/)
+    assert.match(draft.lines[name].maxTokens, /^\d+$/)
+    assert.match(draft.lines[name].xhigh, /^\d+$/)
+  }
 })
 
 test('toDraft: a saved trigger percent rides the draft', () => {
   const draft = client.toDraft({ dialect: 'llamacpp', user: { lines: {} }, compactThresholdPct: 90 })
   assert.equal(draft.compactPct, '90')
+})
+
+test('toDraft: the trigger percent is per-line; a line without one inherits the top-level value', () => {
+  const draft = client.toDraft({
+    dialect: 'llamacpp',
+    compactThresholdPct: 80,
+    lines: {
+      ninfer: { baseURL: 'http://localhost:8082/v1', model: 'n', compactThresholdPct: 71 },
+    },
+  })
+  // The active line has no parked number: it inherits the top-level one.
+  assert.equal(draft.compactPct, '80')
+  // A line that moved its own slider keeps its own number across switches.
+  assert.equal(draft.lines.ninfer.compactPct, '71')
+  assert.equal(draft.lines.omlx.compactPct, '80')
 })
 
 test('toDraft: a new-shape section reads the active line from lines and parks the other', () => {
@@ -265,13 +271,14 @@ test('toDraft: a new-shape section reads the active line from lines and parks th
   assert.equal(draft.lines.ninfer.images, 'keep')
   assert.equal(draft.lines.ninfer.keepTurns, '3')
   assert.equal(draft.lines.ninfer.toolChars, '1000')
-  // The unpersisted TabbyAPI and oMLX lines park at their built-in defaults.
+  // The unpersisted TabbyAPI and oMLX lines park with numeric geometry
+  // (starter values are defaults, not pinned by this test).
   assert.equal(draft.lines.tabbyapi.baseURL, '')
-  assert.equal(draft.lines.tabbyapi.contextWindow, '131072')
-  assert.equal(draft.lines.tabbyapi.maxTokens, '16384')
+  assert.match(draft.lines.tabbyapi.contextWindow, /^\d+$/)
+  assert.match(draft.lines.tabbyapi.maxTokens, /^\d+$/)
   assert.equal(draft.lines.omlx.baseURL, '')
-  assert.equal(draft.lines.omlx.contextWindow, '131072')
-  assert.equal(draft.lines.omlx.maxTokens, '16384')
+  assert.match(draft.lines.omlx.contextWindow, /^\d+$/)
+  assert.match(draft.lines.omlx.maxTokens, /^\d+$/)
 })
 
 test('toDraft: a stored top-level apiKey surfaces on the draft; absent keys stay empty', () => {

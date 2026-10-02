@@ -273,6 +273,11 @@ function lineRecord(name, raw, fallback) {
     images: src.summarize?.images ?? 'strip',
     keepTurns: String(src.summarize?.keepTurns ?? 5),
     toolChars: String(src.summarize?.toolChars ?? 2000),
+    // Per-line trigger percent: null = no per-line number yet, toDraft
+    // resolves it against the top-level (single-global) value.
+    compactPct: raw?.compactThresholdPct !== undefined && raw?.compactThresholdPct !== null
+      ? String(raw.compactThresholdPct)
+      : null,
   }
 }
 
@@ -313,6 +318,11 @@ export function toDraft(value) {
     tabbyapi: lineRecord('tabbyapi', value.lines?.tabbyapi, dialect === 'tabbyapi' ? legacyTop : undefined),
     omlx: lineRecord('omlx', value.lines?.omlx, dialect === 'omlx' ? legacyTop : undefined),
   }
+  // The trigger percent follows the line: a parked per-line number wins;
+  // a line without one inherits the top-level (single-global-era) value.
+  for (const record of Object.values(lines)) {
+    if (record.compactPct === null) record.compactPct = String(value.compactThresholdPct ?? 80)
+  }
   const active = lines[dialect]
   return {
     dialect,
@@ -333,9 +343,10 @@ export function toDraft(value) {
     // keyless, the wire omits the Authorization header); every line keeps its
     // own copy under `lines`.
     apiKey: active.apiKey,
-    // Not a line field: the trigger ratio is shared across lines; each line's
-    // own context window rescales the token point the ratio lands on.
-    compactPct: String(value.compactThresholdPct ?? 80),
+    // The trigger percent is a LINE field (like the window it scales): each
+    // line parks its own percent, switches carry it, saves write it per line
+    // and mirror the active line's to the top level (the backend reads there).
+    compactPct: active.compactPct,
   }
 }
 
@@ -358,6 +369,7 @@ function liftedInputs(record) {
     images: record.images,
     keepTurns: record.keepTurns,
     toolChars: record.toolChars,
+    compactPct: record.compactPct,
   }
 }
 
@@ -438,10 +450,10 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     }
     setState((s) => ({ ...s, busy: true, error: null }))
     // The top-level fields are what the adapter and the compaction backend
-    // read (the active line); `lines` persists every line — connection, window
-    // numbers, the thinking budget, AND the trim knobs (the context window is a
-    // property of the line's server build, not the model) — so switching
-    // dialect and back restores each one's values.
+    // read (the active line); `lines` persists every line's connection, window
+    // numbers, the thinking budget, the trim knobs, AND the trigger percent
+    // (the context window is a property of the line's server build, not the
+    // model), so switching dialect and back restores each one's values.
     const lineBlock = (record) => ({
       baseURL: record.baseURL,
       model: record.model,
@@ -462,6 +474,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
         keepTurns: Number.parseInt(record.keepTurns, 10),
         toolChars: Number.parseInt(record.toolChars, 10),
       },
+      // This line's own trigger percent (every draft line record carries a
+      // resolved number, so parked lines persist their inherited value too).
+      compactThresholdPct: Number.parseInt(record.compactPct, 10),
     })
     // The active line's persisted record is the parked record with the flat
     // inputs re-applied (the user edits ride the flat fields, not the record).
@@ -479,6 +494,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       images: draft.images,
       keepTurns: draft.keepTurns,
       toolChars: draft.toolChars,
+      compactPct: draft.compactPct,
     }
     const persistedLines = { ...draft.lines, [draft.dialect]: activeRecord }
     const patch = {
@@ -561,9 +577,6 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   const labelPct = budgetClamped ? Math.floor((triggerTokens * 100) / windowTokens) : sliderPct
   return React.createElement('div', { className: 'qol' },
     React.createElement('h2', { className: 'qol-title' }, t.title),
-    state.error !== null
-      ? React.createElement('p', { className: 'qol-error', role: 'alert' }, state.error)
-      : null,
     // Server line: the headline control — it switches the thinking wire for
     // every request the plugin route serves.
     React.createElement('section', { className: 'qol-group' },
@@ -707,6 +720,12 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
           React.createElement(Input, { className: 'qol-input', inputMode: 'numeric', value: draft.toolChars, onChange: digitsOnly((v) => { setDraft({ toolChars: v }) }) })),
       ),
     ),
+    // Save errors ride directly above the save button (the page is long; an
+    // error parked under the title scrolls out of sight exactly when the user
+    // needs it). The slider's own red checker stays where it is.
+    state.error !== null
+      ? React.createElement('p', { className: 'qol-error', role: 'alert' }, state.error)
+      : null,
     React.createElement('div', { className: 'qol-footer' },
       React.createElement(Button, { variant: 'primary', disabled: state.busy, onClick: () => { void doSave() } }, state.busy ? t.saving : t.save),
       state.saved ? React.createElement('span', { className: 'qol-saved' }, t.saved) : null,

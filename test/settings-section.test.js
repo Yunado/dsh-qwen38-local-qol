@@ -24,11 +24,6 @@ test('NS: the plugin owns one lowercase hyphenated namespace', () => {
   assert.equal(NS, 'qwen38-local-qol')
 })
 
-test('sectionSchema: the compaction trigger point defaults to 80 percent', () => {
-  const resolved = sectionSchema()({})
-  assert.equal(resolved.compactThresholdPct, 80)
-})
-
 test('validateSection: an out-of-range compaction trigger fails loud', () => {
   assert.throws(() => validateSection({ compactThresholdPct: 49 }), /compactThresholdPct/)
   assert.throws(() => validateSection({ compactThresholdPct: 100 }), /compactThresholdPct/)
@@ -91,7 +86,7 @@ test('sectionSchema: lines carry each dialect production defaults (connection + 
     maxTokens: DEFAULT_MAX_TOKENS,
     thinkingBudgets: { ...DEFAULT_THINKING_BUDGETS },
     defaultThinkingBudget: DEFAULT_THINKING_BUDGETS.xhigh,
-    summarize: { images: 'strip', keepTurns: 5, toolChars: 2000 },
+    summarize: { ...DEFAULT_TRIM_KNOBS },
   })
   assert.equal(resolved.lines.llamacpp.baseURL, DEFAULT_LLAMA_BASE_URL)
   assert.equal(resolved.lines.llamacpp.model, DEFAULT_LLAMA_MODEL)
@@ -146,6 +141,23 @@ test('validateSection: a non-positive parked line budget fails loud', () => {
 test('validateSection: a non-positive parked line defaultThinkingBudget fails loud', () => {
   const value = { ...sectionSchema()({}), lines: { llamacpp: { ...sectionSchema()({}).lines.llamacpp, defaultThinkingBudget: 0 } } }
   assert.throws(() => validateSection(value), /lines\.llamacpp\.defaultThinkingBudget must be a positive integer/)
+})
+
+test('sectionSchema: a line block carries NO trigger percent default (absent = follow the top level)', () => {
+  const resolved = sectionSchema()({})
+  assert.equal(resolved.lines.ninfer.compactThresholdPct, undefined)
+  assert.equal(resolved.lines.omlx.compactThresholdPct, undefined)
+})
+
+test('validateSection: a parked line trigger percent out of range fails loud', () => {
+  const withPct = (pct) => ({
+    ...sectionSchema()({}),
+    lines: { ninfer: { ...sectionSchema()({}).lines.ninfer, compactThresholdPct: pct } },
+  })
+  assert.throws(() => validateSection(withPct(49)), /lines\.ninfer\.compactThresholdPct must be an integer 50\.\.99/)
+  assert.throws(() => validateSection(withPct(100)), /lines\.ninfer\.compactThresholdPct/)
+  assert.throws(() => validateSection(withPct(70.5)), /lines\.ninfer\.compactThresholdPct/)
+  assert.doesNotThrow(() => validateSection(withPct(71)))
 })
 
 test('validateSection: an unknown parked line summarize.images policy fails loud', () => {

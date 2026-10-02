@@ -86,8 +86,9 @@ const volatile = (schema) => schema.volatile()
  * shipped patch rows use that flat form); `lines` is the per-dialect memory,
  * and the block named by `line` becomes the live one when it is set -
  * including the thinking budget (a property of the line's server build, e.g.
- * NInfer's `--default-thinking-budget`) and the trim knobs (a per-line
- * preference).
+ * NInfer's `--default-thinking-budget`), the trim knobs and the compaction
+ * trigger percent (per-line preferences; a line without one follows the
+ * top-level value).
  */
 function lineSchema(baseURL, model, contextWindow, maxTokens, budgets, mark) {
   return Schema.object({
@@ -111,6 +112,12 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets, mark) {
       keepTurns: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.keepTurns),
       toolChars: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.toolChars),
     }),
+    // This line's own compaction trigger percent. Deliberately WITHOUT a
+    // schema default: absent means "follow the top-level value", so a profile
+    // upgraded from the single-global-pct era keeps its top-level percent on
+    // every line until the user moves a slider there and parks a per-line
+    // number. The settings tab writes the active line's percent on every save.
+    compactThresholdPct: mark(Schema.number()),
   })
 }
 
@@ -151,14 +158,16 @@ function buildSchema(mark) {
       keepTurns: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.keepTurns),
       toolChars: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.toolChars),
     }),
-    // Where automatic pressure compaction fires, as a percent of the active
-    // line's context window: the compaction backend reads it at every trigger
-    // evaluation and feeds the engine's thresholdRatio (hot, no restart). The
-    // floor 50: below that the fixed overhead (system prompt + tool
-    // definitions) plus the checkpoint floor would leave compaction cycles
-    // almost nothing to free; the ceiling 99 leaves the line's own output
-    // reservation to cap the effective point (the engine takes
-    // `min(window x ratio, window - output)`).
+    // Where automatic pressure compaction fires on THIS line, as a percent of
+    // its context window: the settings tab writes it per line, and the active
+    // line's value is mirrored to the top level on every save (the compaction
+    // backend reads that top-level leaf at trigger evaluation, hot, no
+    // restart). The floor 50: below that the fixed overhead (system prompt +
+    // tool definitions) plus the checkpoint floor would leave compaction
+    // cycles almost nothing to free; the ceiling 99 leaves the line's own
+    // output reservation to cap the effective point (the engine takes
+    // `min(window x ratio, window - output)`). A line without a per-line value
+    // already carries this top-level number (single-global-pct profiles).
     compactThresholdPct: mark(Schema.number()).default(80),
     // The compaction wiring status rode the pre-0.2.0 section base (the tab
     // rendered it); the 0.2.0 Config does not carry status fields - the
@@ -240,6 +249,11 @@ export function validateSection(value) {
     const lineDefaultBudget = line.defaultThinkingBudget
     if (lineDefaultBudget !== undefined && (!Number.isInteger(lineDefaultBudget) || lineDefaultBudget <= 0)) {
       throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.defaultThinkingBudget must be a positive integer, got ${String(lineDefaultBudget)}`)
+    }
+    if (line.compactThresholdPct !== undefined
+      && (!Number.isInteger(line.compactThresholdPct)
+        || line.compactThresholdPct < 50 || line.compactThresholdPct > 99)) {
+      throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.compactThresholdPct must be an integer 50..99, got ${String(line.compactThresholdPct)}`)
     }
     checkBudgetsFitCap(line.maxTokens, line.thinkingBudgets ?? {}, lineDefaultBudget, `lines.${lineName}.`)
     const lineImages = line.summarize?.images
