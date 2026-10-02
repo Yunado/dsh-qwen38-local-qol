@@ -245,15 +245,18 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 （schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
 下一 wire body 变）。
 
-## 12. 发布态（release，v0.3.1 = 本 commit；M0-M6 全部落地后的现状注记）
+## 12. 发布态（release，v0.3.2 = 本 commit；M0-M6 全部落地后的现状注记）
 
 - **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；新装默认
   统一 `{131072, 16384}`（v0.3.1 starter，patch 行按服务端显式覆盖）；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
+- **新装块只带两行锚点**（v0.3.2）：bundle `cordis.patch.yml` 仅 `dialect: llamacpp` + `baseURL:
+  http://localhost:8080/v1`，数值单一事实源 = config.js；四线缺省端口 8080/8081/8082/8083 互不撞车；
+  plugin.test 契约测试禁止 patch 再出现数值。
 - **preset 由 bundle patch 声明**（不再 boot 写盘：老 auto-apply 已退役）：qwen38
   preset + `default: qwen38` 注册行都随 patch insert，升级同 id 自动接管；GUI 选 qwen38 preset。
 - **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
-  值；热加载免重启；zh/en 双语。suite = 133 用例全绿。
+  值；热加载免重启；zh/en 双语。suite = 138 用例全绿。
 - **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
   llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024，
   NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
@@ -287,7 +290,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   262K 线 50→帽 104,857/触发 131,072；80→41,943/209,715；83→35,651/217,582（=83.0%）。开环控制:判定尺子=上次请求 meter,
   guard=判定后增长(工具结果+注入,实测最坏单步 ~23K)的补偿带；pct 越高 guard 越小，超长单步偶触墙时宿主的 context-overflow
   重触发兜底。滑杆 `compactThresholdPct` UI 固定 50..90（schema 50..99 向后兼容），热生效每 step。
-   **pct 随线**（v0.3.1 后补）：`lines.<线>.compactThresholdPct` 可选字段（无 schema 默认，缺省 = 继承顶层），tab 保存写活动线的
+   **pct 随线**（v0.3.2）：`lines.<线>.compactThresholdPct` 可选字段（无 schema 默认，缺省 = 继承顶层），tab 保存写活动线的
    `lines` 块并把活动线值 mirror 到顶层（backend 只读顶层 leaf，零改动）；旧单值 profile 升级后各线先继承顶层旧值、行为不变，
    哪条线拖过滑杆才 park 自己的数。
 - **帽联动的红 checker + budget<cap 校验**：同步帽若 < thinking 预算所需 room（`max(thinkingBudgets)+2048`，思考与回答共用帽），
