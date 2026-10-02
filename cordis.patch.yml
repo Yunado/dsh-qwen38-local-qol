@@ -2,18 +2,21 @@
 # The compaction backend row rides the qwen38 agent preset declared by
 # presets/qwen38.patch.yml (the companion patch in this bundle's list),
 # because the per-session agent preset owns the isolated compaction group.
+#
+# The fresh-install config is deliberately a TWO-FIELD anchor, not a full
+# block. c95e226's intent ("fresh installs open on the llama.cpp line at the
+# stock llama-server port") is carried here explicitly; every other number
+# (model alias, display name, context window, output cap, thinking budgets,
+# default effort, trigger percent) stays with the single source of truth in
+# src/config.js, whose declared policy is that defaults aim low and users
+# raise them per line to the real server context. The earlier block duplicated
+# the whole config in YAML and drifted into the 27B-era numbers it could never
+# re-sync (a GGUF file name as the model, a 224K window that exceeds what a
+# local server can host); a fresh install opening on those numbers contradicted
+# the plugin's own policy, so the duplication is gone.
 - insert:
     - id: qwen38
       name: dsh-qwen38-local-qol
       config:
-        baseURL: http://localhost:8080/v1
-        model: Huihui-Qwen3.8-27B-abliterated-UD-Q5_K_XL
-        displayName: Qwen3.8-27B
         dialect: llamacpp
-        contextWindow: 229376
-        maxTokens: 24576
-        thinkingBudgets:
-          low: 4096
-          medium: 8192
-          xhigh: 16384
-        defaultEffort: medium
+        baseURL: http://localhost:8080/v1

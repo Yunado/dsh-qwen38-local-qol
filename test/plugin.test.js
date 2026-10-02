@@ -3,6 +3,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import * as plugin from '../src/index.js'
 import { QwenLocalAdapter } from '../src/adapter.js'
 import { liveConfigView } from '../src/settings-section.js'
@@ -240,4 +241,22 @@ test('apply: never writes the home at boot (the legacy auto-apply is gone; prese
   // clean return and zero warnings.
   assert.equal(ctx.warnings.length, 0)
   assert.equal(writes.length, 0)
+})
+
+test('bundle patch: the fresh-install config is the llama.cpp anchor ONLY (no duplicated numbers)', () => {
+  // The bundle's cordis.patch.yml must stay a two-field anchor (dialect +
+  // baseURL). Duplicating the full config in YAML is how the 27B-era numbers
+  // (a GGUF file name, a 224K window, a 24K cap) drifted into fresh installs
+  // and contradicted config.js's aim-low policy. Every other value must come
+  // from config.js's defaults, so it must not appear in this file at all.
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  const keys = [...patch.matchAll(/^ {8}([a-zA-Z]\w*):/gm)].map((match) => match[1])
+  assert.deepEqual(keys, ['dialect', 'baseURL'], 'fresh-install config must carry only the anchor fields')
+  assert.match(patch, /dialect: llamacpp/)
+  assert.match(patch, /baseURL: http:\/\/localhost:8080\/v1/)
+  // The retired 27B-era values (and the fields config.js owns) must never
+  // reappear anywhere in the file, comments included.
+  for (const stale of ['229376', '24576', 'Huihui', 'abliterated', 'contextWindow', 'maxTokens', 'thinkingBudgets', 'defaultEffort', 'displayName']) {
+    assert.ok(!patch.includes(stale), `cordis.patch.yml must not duplicate ${stale} (config.js owns it)`)
+  }
 })

@@ -57,7 +57,7 @@ profile（其 tui profile）有效。
 因此两半区两个落点：
 
 ```yaml
-# cordis.patch.yml（bundle patch → root 层，provider 行）
+# 用户 profile 的 cordis.patch.yml（示例 = 生产 ninfer 线：patch 行可显式声明各线几何）
 - insert:
     - id: qwen38
       name: dsh-qwen38-local-qol
@@ -70,7 +70,10 @@ profile（其 tui profile）有效。
         thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }   # 漏配档位回退 xhigh 值（thinking 开的请求永远带帽）
 ```
 
-patch 行显式声明各线几何（示例即生产 ninfer 线）。内置新装默认统一 `{131072, 16384}`
+**包内 bundle patch 自带的新装块只有两个锚点字段**（`dialect: llamacpp` + `baseURL:
+http://localhost:8080/v1`，c95e226 的"新装开在 llama 线"意图）；其余数值一律走 config.js
+缺省单一事实源，plugin.test 的契约测试钉死这个形状防再漂移（历史上整块复制漂移进过 27B
+残骸）。上面这种**完整几何块是用户在自己 profile 里手写/设置 tab 保存的形状**。内置新装默认统一 `{131072, 16384}`
 （starter 值，任何本地服务都扛得住；用户按服务端真实 ctx 上调；client `LINE_WINDOW_DEFAULTS`
 与 `DEFAULT_*` 常量同源，§13 的滑杆联动保证任何几何下触发点精确）。其余三线同形状，
 仅 endpoint/model/dialect 不同。
@@ -120,7 +123,7 @@ patch 行显式声明各线几何（示例即生产 ninfer 线）。内置新装
 
 | 键 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `baseURL` | string | `http://localhost:8082/v1` | 含 `/v1`，不重复拼 |
+| `baseURL` | string | `http://localhost:8080/v1`（llama）；四线缺省端口阶梯 8080/8081/8082/8083 | 含 `/v1`，不重复拼 |
 | `model` | string | 必填 | 服务端 alias |
 | `apiKey` | string | 无（不发 Authorization） | 或服务端 `--api-key` 同值 |
 | `dialect` | `'ninfer' \| 'llamacpp' \| 'tabbyapi' \| 'omlx'` | 必填 | 决定 effort/budget 的 wire 位置（见 §5） |
@@ -284,11 +287,14 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   262K 线 50→帽 104,857/触发 131,072；80→41,943/209,715；83→35,651/217,582（=83.0%）。开环控制:判定尺子=上次请求 meter,
   guard=判定后增长(工具结果+注入,实测最坏单步 ~23K)的补偿带；pct 越高 guard 越小，超长单步偶触墙时宿主的 context-overflow
   重触发兜底。滑杆 `compactThresholdPct` UI 固定 50..90（schema 50..99 向后兼容），热生效每 step。
+   **pct 随线**（v0.3.1 后补）：`lines.<线>.compactThresholdPct` 可选字段（无 schema 默认，缺省 = 继承顶层），tab 保存写活动线的
+   `lines` 块并把活动线值 mirror 到顶层（backend 只读顶层 leaf，零改动）；旧单值 profile 升级后各线先继承顶层旧值、行为不变，
+   哪条线拖过滑杆才 park 自己的数。
 - **帽联动的红 checker + budget<cap 校验**：同步帽若 < thinking 预算所需 room（`max(thinkingBudgets)+2048`，思考与回答共用帽），
   该触发点在此几何**根本落不了地**：cap park 在 room、状态区红 checker 点名所需帽值、**保存被拒**，直到调低预算或把滑杆调低。
   262K 线 xhigh 32768（room 34,816）：pct ≤83 全绿；84 起红（neededCap 33,554），park 34,816 → 有效触发 218,624（83.4%）。
   校验 fail-closed：`validateSection` 在写入即拒（顶层 + 每线：每个 thinkingBudgets 档与 defaultThinkingBudget 必须严格 <
-  该线 maxTokens），client 保存路径同规则报错（budgetCap 文案）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
+  该线 maxTokens；每线 `compactThresholdPct` 若存在必须整数 50..99），client 保存路径同规则报错（budgetCap 文案）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
    `defaultThinkingBudget` = 服务端 thinking 上限的**申报值**（不发 wire；room 与校验读它）。仅 ninfer 线在设置页渲染该格
    （ninfer 无视逐请求预算，真实值只在启动参数里，申报是唯一真相渠道）；其他线三档表全覆盖，字段不渲染、保留存储兼容。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token

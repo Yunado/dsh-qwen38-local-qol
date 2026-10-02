@@ -1,7 +1,8 @@
 /**
  * Plugin configuration resolution: patch row first, then `DSH_QWEN38_*`
- * environment variables, then built-in defaults matching the production
- * Qwen3.8-27B line (NInfer 0.5.0 on 8082, 224K context).
+ * environment variables, then built-in defaults. The defaults aim low (128K
+ * starter geometry any local server can host) and put the four lines on their
+ * own default ports (ladder 8080 / 8081 / 8082 / 8083).
  *
  * @module dsh-qwen38-local-qol/config
  */
@@ -29,11 +30,13 @@ export function plainConfig(value) {
 }
 
 /**
- * NInfer line default server address when nothing configures one: the
- * standard local llama port, shared with the llama.cpp line's default (a
- * different port goes in the baseURL field or the DSH_QWEN38_BASE_URL env).
+ * NInfer line default server address when nothing configures one: 8081, the
+ * second slot of the fresh-install port ladder 8080 / 8081 / 8082 / 8083
+ * (llama.cpp, NInfer, TabbyAPI, oMLX) so the four lines never collide out of
+ * the box. A different port goes in the baseURL field or the
+ * DSH_QWEN38_BASE_URL env.
  */
-export const DEFAULT_BASE_URL = 'http://localhost:8080/v1'
+export const DEFAULT_BASE_URL = 'http://localhost:8081/v1'
 
 /**
  * NInfer line model id when nothing configures one: the neutral line name,
@@ -44,7 +47,7 @@ export const DEFAULT_MODEL = 'qwen3.8-27b'
 
 /**
  * llama.cpp line default server address when nothing configures one: the
- * standard llama-server port (the same address as the NInfer line's default).
+ * standard llama-server port, first slot of the fresh-install port ladder.
  */
 export const DEFAULT_LLAMA_BASE_URL = 'http://localhost:8080/v1'
 
@@ -98,18 +101,18 @@ export const DEFAULT_MAX_TOKENS = 16384
  * The fresh-install pair matches the shared low defaults; ExLlamaV3 users
  * commonly raise both (its cache sizing then has to match in the server too).
  */
-export const DEFAULT_TABBYAPI_BASE_URL = 'http://localhost:8083/v1'
+export const DEFAULT_TABBYAPI_BASE_URL = 'http://localhost:8082/v1'
 export const DEFAULT_TABBYAPI_MODEL = 'Qwen3.8-Flash-Next-4.05bpw'
 export const DEFAULT_TABBYAPI_CONTEXT_WINDOW = 131072
 export const DEFAULT_TABBYAPI_MAX_TOKENS = 16384
 
 /**
  * oMLX line defaults: the Apple Silicon MLX server for Qwen3.8-27B (port
- * 8000). oMLX ships at a 32K context out of the box, so the admin panel's
- * Global Settings (Max Context Window / Max Tokens, hot) must raise both to
- * meet the tab's declared numbers.
+ * 8083, last slot of the fresh-install ladder). oMLX ships at a 32K context
+ * out of the box, so the admin panel's Global Settings (Max Context Window /
+ * Max Tokens, hot) must raise both to meet the tab's declared numbers.
  */
-export const DEFAULT_OMLX_BASE_URL = 'http://localhost:8000/v1'
+export const DEFAULT_OMLX_BASE_URL = 'http://localhost:8083/v1'
 export const DEFAULT_OMLX_MODEL = 'Qwen3.8-27B-MLX-8bit'
 export const DEFAULT_OMLX_CONTEXT_WINDOW = 131072
 export const DEFAULT_OMLX_MAX_TOKENS = 16384
@@ -218,8 +221,9 @@ export function resolveConfig(config = {}, env = process.env) {
   }
 
   return {
-    // The base-url default follows the dialect (the 224K lines share the
-    // standard llama-server port; the ExLlamaV3 line has its own port; oMLX defaults to 8000).
+    // The base-url default follows the dialect: every line owns its slot in
+    // the fresh-install port ladder (llama.cpp 8080, NInfer 8081, TabbyAPI
+    // 8082, oMLX 8083), so no two lines collide on one port out of the box.
     baseURL: setting(config.baseURL, env.DSH_QWEN38_BASE_URL, dialect === DIALECT_TABBYAPI ? DEFAULT_TABBYAPI_BASE_URL : dialect === DIALECT_OMLX ? DEFAULT_OMLX_BASE_URL : dialect === DIALECT_NINFER ? DEFAULT_BASE_URL : DEFAULT_LLAMA_BASE_URL),
     // The model default follows the dialect (the 224K lines share the neutral
     // line name; the ExLlamaV3 and oMLX lines name their local artifacts).

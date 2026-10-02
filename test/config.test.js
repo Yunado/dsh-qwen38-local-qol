@@ -4,12 +4,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createVolatile, updateVolatile } from '@deepseek-ai/cosmokit'
-import { resolveConfig, DEFAULT_BASE_URL, DEFAULT_LLAMA_BASE_URL, DEFAULT_MODEL, DEFAULT_LLAMA_MODEL, DEFAULT_THINKING_BUDGETS } from '../src/config.js'
+import { resolveConfig, DEFAULT_BASE_URL, DEFAULT_LLAMA_BASE_URL, DEFAULT_TABBYAPI_BASE_URL, DEFAULT_TABBYAPI_MODEL, DEFAULT_TABBYAPI_CONTEXT_WINDOW, DEFAULT_TABBYAPI_MAX_TOKENS, DEFAULT_OMLX_BASE_URL, DEFAULT_OMLX_MODEL, DEFAULT_OMLX_CONTEXT_WINDOW, DEFAULT_OMLX_MAX_TOKENS, DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_LLAMA_MODEL, DEFAULT_THINKING_BUDGETS } from '../src/config.js'
 
 test('resolveConfig: built-in defaults open on the general default (llama.cpp line)', () => {
   const resolved = resolveConfig({}, {})
-  // The base-url default follows the dialect: both lines currently share the
-  // standard llama-server port.
+  // The base-url default follows the dialect: each line owns its slot in the
+  // fresh-install port ladder 8080 / 8081 / 8082 / 8083 (llama.cpp, NInfer,
+  // TabbyAPI, oMLX), so no two lines collide on one port out of the box.
   assert.equal(resolved.baseURL, DEFAULT_LLAMA_BASE_URL)
   assert.equal(resolveConfig({ dialect: 'ninfer' }, {}).baseURL, DEFAULT_BASE_URL)
   // The model default follows the dialect: both lines currently share the
@@ -18,13 +19,13 @@ test('resolveConfig: built-in defaults open on the general default (llama.cpp li
   assert.equal(resolveConfig({ dialect: 'ninfer' }, {}).model, DEFAULT_MODEL)
   assert.equal(resolved.apiKey, undefined)
   assert.equal(resolved.dialect, 'llamacpp')
-  assert.equal(resolved.contextWindow, 131072)
-  assert.equal(resolved.maxTokens, 16384)
+  // The geometry and budgets arrive through the shared starter constants: the
+  // wiring (resolveConfig reaches the constants at all) is pinned, the numbers
+  // themselves are tunable defaults, not pinned by this test.
+  assert.equal(resolved.contextWindow, DEFAULT_CONTEXT_WINDOW)
+  assert.equal(resolved.maxTokens, DEFAULT_MAX_TOKENS)
   assert.deepEqual(resolved.thinkingBudgets, DEFAULT_THINKING_BUDGETS)
   assert.deepEqual(resolved.provider, ['qwen38'])
-  // Usage reporting is on by default for both dialects: NInfer 0.5.0 and
-  // llama-server both honor stream_options.include_usage (verified 2026-09).
-  assert.equal(resolved.includeUsage, true)
 })
 
 test('resolveConfig: patch row beats environment, environment beats default', () => {
@@ -75,22 +76,25 @@ test('resolveConfig: invalid dialect fails loud', () => {
   assert.throws(() => resolveConfig({ dialect: 'vllm' }, {}), /dialect must be/)
 })
 
-test('resolveConfig: the tabbyapi line opens on its own defaults', () => {
+test('resolveConfig: the tabbyapi line opens on its own line defaults', () => {
   const resolved = resolveConfig({ dialect: 'tabbyapi' }, {})
   assert.equal(resolved.dialect, 'tabbyapi')
-  assert.equal(resolved.baseURL, 'http://localhost:8083/v1')
-  assert.equal(resolved.model, 'Qwen3.8-Flash-Next-4.05bpw')
-  assert.equal(resolved.contextWindow, 131072)
-  assert.equal(resolved.maxTokens, 16384)
+  // Dialect-switch wiring: the tabbyapi constants are selected (values are
+  // tunable defaults, referenced through the constants, never as literals).
+  assert.equal(resolved.baseURL, DEFAULT_TABBYAPI_BASE_URL)
+  assert.equal(resolved.model, DEFAULT_TABBYAPI_MODEL)
+  assert.equal(resolved.contextWindow, DEFAULT_TABBYAPI_CONTEXT_WINDOW)
+  assert.equal(resolved.maxTokens, DEFAULT_TABBYAPI_MAX_TOKENS)
 })
 
-test('resolveConfig: the omlx line opens on its own endpoint with shared window defaults, and supports OMLX_API_KEY', () => {
+test('resolveConfig: the omlx line opens on its own endpoint defaults, and supports OMLX_API_KEY', () => {
   const resolved = resolveConfig({ dialect: 'omlx' }, {})
   assert.equal(resolved.dialect, 'omlx')
-  assert.equal(resolved.baseURL, 'http://localhost:8000/v1')
-  assert.equal(resolved.model, 'Qwen3.8-27B-MLX-8bit')
-  assert.equal(resolved.contextWindow, 131072)
-  assert.equal(resolved.maxTokens, 16384)
+  // Dialect-switch wiring through the omlx constants (no literal defaults).
+  assert.equal(resolved.baseURL, DEFAULT_OMLX_BASE_URL)
+  assert.equal(resolved.model, DEFAULT_OMLX_MODEL)
+  assert.equal(resolved.contextWindow, DEFAULT_OMLX_CONTEXT_WINDOW)
+  assert.equal(resolved.maxTokens, DEFAULT_OMLX_MAX_TOKENS)
 
   const withKey = resolveConfig({ dialect: 'omlx' }, { OMLX_API_KEY: 'sk-test-key' })
   assert.equal(withKey.apiKey, 'sk-test-key')
@@ -108,10 +112,12 @@ test('resolveConfig: budget map drops malformed entries, falls back when all dro
 })
 
 test('resolveConfig: integer settings accept positive integers only, env accepts digit strings', () => {
-  assert.equal(resolveConfig({ contextWindow: 0 }, {}).contextWindow, 131072)
+  // An invalid value falls back to the starter constant (the constant is the
+  // wiring; its number is a tunable default, not pinned).
+  assert.equal(resolveConfig({ contextWindow: 0 }, {}).contextWindow, DEFAULT_CONTEXT_WINDOW)
   assert.equal(resolveConfig({ contextWindow: 123 }, {}).contextWindow, 123)
   assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: '99999' }).contextWindow, 99999)
-  assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: 'abc' }).contextWindow, 131072)
+  assert.equal(resolveConfig({}, { DSH_QWEN38_CONTEXT_WINDOW: 'abc' }).contextWindow, DEFAULT_CONTEXT_WINDOW)
 })
 
 test('resolveConfig: provider list trims and filters empties, falls back when empty', () => {

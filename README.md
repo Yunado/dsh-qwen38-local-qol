@@ -65,7 +65,7 @@ DSH settings → **Qwen3.8 Local**:
 
 ![the Qwen3.8 Local settings tab](<docs/tab-en.png>)
 
-Per-line memory (connection, window numbers, budgets, trim knobs). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to the profile's plugin config (Cordis patch; hot volatile commits, no restart).
+Per-line memory (connection, window numbers, budgets, trim knobs, and the compaction trigger percent). The status dot is green when `qwen38` is the default preset, amber when a different preset is the default, gray when the preset is missing. Changes apply live and persist to the profile's plugin config (Cordis patch; hot volatile commits, no restart).
 
 ## What can be tuned
 
@@ -73,12 +73,12 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 | Area | Fields (env vars) | Defaults |
 |---|---|---|
-| Server | `baseURL`, `model`, `displayName`, `apiKey` (`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`) | `http://localhost:8080/v1` (llama) / `8082` (ninfer) / `8083` (tabbyapi) / `8000` (omlx), model alias, same as `model`, none |
+| Server | `baseURL`, `model`, `displayName`, `apiKey` (`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`) | `http://localhost:8080/v1` (llama) / `8081` (ninfer) / `8082` (tabbyapi) / `8083` (omlx), model alias, same as `model`, none |
 | Dialect | `dialect` (`DSH_QWEN38_DIALECT`) | `llamacpp` (options: `ninfer`, `tabbyapi`, `omlx`) |
 | Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `131072`, `16384` (starter defaults every local server can host; raise them to your server's real context, and keep the tab at or below what the server was started with) |
 | Thinking | `thinkingBudgets` (llamacpp + tabbyapi + omlx, per effort), `defaultThinkingBudget` (the declared server thinking ceiling; the tab shows it on the ninfer line only — enter the server's `--default-thinking-budget` value there, the plugin cannot read the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 2048, medium: 4096, xhigh: 8192 }`, `8192`, `medium` |
 | Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` (env only) | `strip`, `5`, `2000` |
-| Compaction trigger | `compactThresholdPct` (the tab slider) | `80` (fires at exactly that percent of the window; the slider syncs the output cap to keep the point reachable) |
+| Compaction trigger | `compactThresholdPct` (the tab slider, per-line memory) | `80` (fires at exactly that percent of the window; lines never moved keep the top-level value, moved lines store their own; the slider syncs the output cap to keep the point reachable) |
 
 ### Settings & Fields Explained
 
@@ -88,7 +88,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
   - `omlx`: Apple Silicon MLX inference server. Sends per-request thinking budget via native `thinking_budget`.
   - `tabbyapi`: ExLlamaV3 backend. Fast path for EXL3 quants, accepts per-request budgets natively.
   - `ninfer`: High-performance TensorRT-LLM engine. Thinking budget is configured at server startup.
-- **Base URL (`baseURL`)**: The address where your local server is listening (must include `/v1`). Default ports: `8080` for llama.cpp, `8000` for oMLX, `8082` for NInfer, `8083` for TabbyAPI.
+- **Base URL (`baseURL`)**: The address where your local server is listening (must include `/v1`). Default ports form a collision-free ladder: `8080` for llama.cpp, `8081` for NInfer, `8082` for TabbyAPI, `8083` for oMLX.
 - **Model (`model`)**: The model identifier or alias recognized by your server (e.g. `Qwen3.8-27B-MLX-8bit` or `qwen3.8-27b`).
 - **Display Name (`displayName`)**: Optional label shown in the Harness UI model picker (e.g. "Qwen 3.8 Local"). If blank, the model ID is shown.
 - **API Key (`apiKey`)**: Optional bearer token if your server requires authentication. Leave blank for unauthenticated local servers.
@@ -107,7 +107,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 #### 4. History Compaction & Trimming
 When conversations approach the context window limit, Harness compresses older history into summaries:
-- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must stay strictly below the output cap; the tab refuses the save otherwise. Current usage lives in the chat page's top meter.
+- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The percent is a line field: each server line remembers its own slider position (moved from its tab, saved into its `lines` block), and the active line's value is mirrored to the top level where the compaction backend reads it. A line without its own percent inherits the top-level one, so profiles from the single-global-percent era keep their setting untouched. The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must stay strictly below the output cap; the tab refuses the save otherwise. Current usage lives in the chat page's top meter.
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
@@ -214,7 +214,7 @@ DSH 设置 → **Qwen3.8 本地**：
 
 ![Qwen3.8 本地设置页](<docs/tab-cn.png>)
 
-按线记忆（连接、窗口数字、预算、裁剪旋钮）。状态圆点：绿 = `qwen38` 是默认 preset，黄 = 默认是别的 preset，灰 = preset 缺失。改动即时生效并持久化到 profile 的插件配置（Cordis patch，volatile 热提交，无需重启）。
+按线记忆（连接、窗口数字、预算、裁剪旋钮、压缩触发百分比）。状态圆点：绿 = `qwen38` 是默认 preset，黄 = 默认是别的 preset，灰 = preset 缺失。改动即时生效并持久化到 profile 的插件配置（Cordis patch，volatile 热提交，无需重启）。
 
 ## 可调项
 
@@ -222,12 +222,12 @@ DSH 设置 → **Qwen3.8 本地**：
 
 | 区域 | 字段（环境变量） | 默认 |
 |---|---|---|
-| 服务器 | `baseURL`、`model`、`displayName`、`apiKey`（`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`） | `http://localhost:8080/v1`（llama）/ `8082`（ninfer）/ `8083`（tabbyapi）/ `8000`（omlx）、模型别名、同 `model`、无 |
+| 服务器 | `baseURL`、`model`、`displayName`、`apiKey`（`DSH_QWEN38_BASE_URL` / `_MODEL` / `_DISPLAY_NAME` / `_API_KEY`） | `http://localhost:8080/v1`（llama）/ `8081`（ninfer）/ `8082`（tabbyapi）/ `8083`（omlx）、模型别名、同 `model`、无 |
 | 方言 | `dialect`（`DSH_QWEN38_DIALECT`） | `llamacpp`（可选：`ninfer`、`tabbyapi`、`omlx`） |
 | 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `131072`、`16384`（新装起步值，任何本地服务都扛得住；请按服务的真实上下文调大，且设置页不得超过服务启动时设定的上限） |
 | Thinking | `thinkingBudgets`（llamacpp + tabbyapi + omlx，按 effort）、`defaultThinkingBudget`（申报的服务端 thinking 上限；设置页仅在 ninfer 线显示这一格——把服务启动参数 `--default-thinking-budget` 的值填在这里，插件读不到启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 2048, medium: 4096, xhigh: 8192 }`、`8192`、`medium` |
 | Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`（仅环境变量） | `strip`、`5`、`2000` |
-| 压缩触发 | `compactThresholdPct`（tab 滑杆） | `80`（触发点 = 该百分比 × 窗口；滑杆双向联动输出上限，保证该点精确落地） |
+| 压缩触发 | `compactThresholdPct`（tab 滑杆，随线记忆） | `80`（触发点 = 该百分比 × 窗口；未单独调过滑杆的线继承顶层值，调过则各线各存；滑杆双向联动输出上限，保证该点精确落地） |
 
 ### 设置项与字段说明
 
@@ -237,7 +237,7 @@ DSH 设置 → **Qwen3.8 本地**：
   - `omlx`：Apple Silicon 专用的 MLX 推理服务，每请求通过顶层 `thinking_budget` 控制思考预算。
   - `tabbyapi`：ExLlamaV3 推理服务，EXL3 量化的快线，原生支持每请求思考预算。
   - `ninfer`：高性能 TensorRT-LLM 引擎，思考预算在服务端启动参数中指定。
-- **服务地址（`baseURL`）**：本地后端服务的 HTTP 地址（需包含 `/v1`）。默认端口：llama.cpp 为 `8080`、oMLX 为 `8000`、NInfer 为 `8082`、TabbyAPI 为 `8083`。
+- **服务地址（`baseURL`）**：本地后端服务的 HTTP 地址（需包含 `/v1`）。默认端口按线组成不撞车的阶梯：llama.cpp `8080`、NInfer `8081`、TabbyAPI `8082`、oMLX `8083`。
 - **模型标识（`model`）**：服务端配置的模型名称或别名（如 `Qwen3.8-27B-MLX-8bit` 或 `qwen3.8-27b`）。
 - **显示名称（`displayName`）**：在 Harness UI 界面模型下拉菜单中显示的友好名称（如 “Qwen 3.8 本地”）。留空时直接显示模型标识。
 - **API 密钥（`apiKey`）**：若本地服务开启了鉴权，在此填入 API Key。若无需鉴权可留空。
