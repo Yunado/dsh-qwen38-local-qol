@@ -260,3 +260,17 @@ test('bundle patch: the fresh-install config is the llama.cpp anchor ONLY (no du
     assert.ok(!patch.includes(stale), `cordis.patch.yml must not duplicate ${stale} (config.js owns it)`)
   }
 })
+
+test('preset patch: references only prompt variables the host still registers', () => {
+  // The prompt renderer retired the built-in {{cwd}} variable in host
+  // 0.2.1-alpha.1 and a lingering reference fails request assembly
+  // fail-closed ("unknown prompt variable", every turn). The renderer
+  // registers provider and model; anything else in this file is a time bomb.
+  // The directory is supplied by the working-directory service as user
+  // context, so the preset must not hand-write it.
+  const preset = readFileSync(new URL('../presets/qwen38.patch.yml', import.meta.url), 'utf8')
+  const variables = [...preset.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1])
+  for (const variable of variables) {
+    assert.ok(['provider', 'model'].includes(variable), `preset must not reference the removed prompt variable {{${variable}}}`)
+  }
+})

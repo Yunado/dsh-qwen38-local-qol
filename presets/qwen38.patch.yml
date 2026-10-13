@@ -20,7 +20,12 @@
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
-              suffix: Your working directory is {{cwd}}.
+              # No `suffix` here on purpose: the host's prompt renderer removed
+              # the built-in current-directory prompt variable in 0.2.1-alpha.1
+              # (a lingering reference fails request assembly fail-closed), and
+              # the working-directory service now supplies the directory as
+              # user context, so a hand-written clause is both broken and
+              # redundant.
               prefix: You are a coding agent powered by the {{model}} model.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
