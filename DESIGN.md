@@ -173,7 +173,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
     client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + 裁剪旋钮 + 压缩触发滑杆/帽联动）
     client-entry.js / client.css  # client 半区入口 + 样式
   lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行；改 src/client.js 后 scripts/build-client.mjs 重建并提交）
-  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（133 用例）
+  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（141 用例）
   docs/               # 六图（server/tab/preset × en/cn）
   README.md           # 中英双语：安装/四线/wire 说明/验证
   DESIGN.md           # 本稿
@@ -245,7 +245,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 （schema 默认/校验）+ client 4（注册/load/save/conflict）+ plugin 活读 1（改源 →
 下一 wire body 变）。
 
-## 12. 发布态（release，v0.3.2 = 本 commit；M0-M6 全部落地后的现状注记）
+## 12. 发布态（release，v0.3.3 = 本 commit；M0-M6 全部落地后的现状注记）
 
 - **四线**：ninfer / llamacpp / tabbyapi / oMLX（§5 表即现网 wire）；新装默认
   统一 `{131072, 16384}`（v0.3.1 starter，patch 行按服务端显式覆盖）；漏配档位回退 xhigh（thinking 开 = 永远带硬帽）。
@@ -256,7 +256,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   preset + `default: qwen38` 注册行都随 patch insert，升级同 id 自动接管；GUI 选 qwen38 preset。
 - **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
-  值；热加载免重启；zh/en 双语。suite = 138 用例全绿。
+  值；热加载免重启；zh/en 双语。suite = 141 用例全绿。
 - **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
   llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024，
   NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
@@ -270,8 +270,12 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 
 ## 13. v0.3.x 发布态（DSH 0.2.0-rc.2 适配，2026-09-30）
 
-- **兼容声明**：tested = 0.2.0-rc.2（生产）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
+- **兼容声明**：tested = 0.2.0-rc.2 与 0.2.1-alpha.1/alpha.2（生产，v0.3.3 起）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
   ≤0.1.6-alpha.2 钉 v0.2.0。peer 钉 `^0.2.0-rc.2`；main 面向 rc.2 线。
+  **0.2.1-alpha.1 起上游移除内置 `{{cwd}}` 提示词变量**（upgrade guide：working-directory），preset persona suffix
+  曾手写该变量 → alpha 宿主上每轮请求组装 fail-closed（"unknown prompt variable"，生产实炸）；v0.3.3 删 suffix
+  （目录由宿主 working-directory 服务作为 user context 注入，手写子句既炸又冗余），plugin.test 加"仅允许
+  provider/model 白名单变量"结构守卫。教训：宿主兼容核查 = 接口缝 diff **+ 本包文案对照上游 upgrade guide 的变量/键移除**，只看接口会漏。
 - **preset 全声明化**：`presets/qwen38.patch.yml`（bundle patch list 第二件）声明完整 roster、
   卡片文案（rc.2 单串双语 "A / B"）、registry default。setup.js/`~/.dsh/.agent-presets` 生成链退役
   （v0.2.0 用户升级后旧目录惰性无害，可删）。
@@ -297,7 +301,9 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   该触发点在此几何**根本落不了地**：cap park 在 room、状态区红 checker 点名所需帽值、**保存被拒**，直到调低预算或把滑杆调低。
   262K 线 xhigh 32768（room 34,816）：pct ≤83 全绿；84 起红（neededCap 33,554），park 34,816 → 有效触发 218,624（83.4%）。
   校验 fail-closed：`validateSection` 在写入即拒（顶层 + 每线：每个 thinkingBudgets 档与 defaultThinkingBudget 必须严格 <
-  该线 maxTokens；每线 `compactThresholdPct` 若存在必须整数 50..99），client 保存路径同规则报错（budgetCap 文案）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
+  该线 maxTokens；每线 `compactThresholdPct` 若存在必须整数 50..99；trim 两旋钮 keepTurns/toolChars 为**非负**整数，0 = 关
+  是该字段的文档化模式），client 保存路径同规则报错（budgetCap 文案；数字门与之对齐：几何与预算要求正、trim 旋钮允许 0，
+  issue #4 的 tab 单边锁死已修）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
    `defaultThinkingBudget` = 服务端 thinking 上限的**申报值**（不发 wire；room 与校验读它）。仅 ninfer 线在设置页渲染该格
    （ninfer 无视逐请求预算，真实值只在启动参数里，申报是唯一真相渠道）；其他线三档表全覆盖，字段不渲染、保留存储兼容。
 - **wire**：rc.2 一等 ToolResultMessage（role:'tool'）投影 + 摘要区 tool 消息上限 + control-token

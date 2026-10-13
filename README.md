@@ -15,21 +15,22 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.2
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.3
 ```
 
 Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.3.2` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
+You can also pin a specific release: add a tag to the spec (`#v0.3.3` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
 
 ## DSH compatibility
 
 | DSH host | Plugin | Status |
 |---|---|---|
-| 0.2.0-rc.2 | `#v0.3.2` | tested (production) |
-| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.2` | should work - same seam batch, not exercised |
+| 0.2.1-alpha.1 and newer | `#v0.3.3` | tested (production); older plugin tags fail every turn there, the host removed the built-in `{{cwd}}` prompt variable |
+| 0.2.0-rc.2 | `#v0.3.2` or `#v0.3.3` | tested (production); v0.3.3 only removes content on top, no new host requirements |
+| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | should work - same seam batch, not exercised |
 | 0.1.6-alpha.2 and older | `#v0.2.0` | supported line |
 
 `main` targets the rc.2 seam batch; stay on `#v0.2.0` with older hosts.
@@ -40,7 +41,7 @@ Upgrading from v0.2.0 (host first, then plugin):
 # 1) update the DSH host to 0.2.0-rc.2 or newer (normal host update).
 # 2) re-pin the plugin (profile dir; Windows: %USERPROFILE%\.dsh\profiles\web):
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.2'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.3'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
 # 3) restart dsh web. Sessions already on qwen38 keep working (same id, new
@@ -111,8 +112,8 @@ When conversations approach the context window limit, Harness compresses older h
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
-- **Keep Recent Reasoning (`summarize.keepTurns`)**: How many recent assistant turns retain their full thought logs (`<think>`). Older turns have their thoughts trimmed because previous reasoning is rarely needed once an action has succeeded.
-- **Cap Tool Output (`summarize.toolChars`)**: Maximum character length kept for bulky command outputs or file reads in compacted history (default: 2,000 characters). Prevents giant terminal logs from flooding the context window.
+- **Keep Recent Reasoning (`summarize.keepTurns`)**: How many recent assistant turns retain their full thought logs (`<think>`). Older turns have their thoughts trimmed because previous reasoning is rarely needed once an action has succeeded. `0` strips reasoning from every turn.
+- **Cap Tool Output (`summarize.toolChars`)**: Maximum character length kept for bulky command outputs or file reads in compacted history (default: 2,000 characters). Prevents giant terminal logs from flooding the context window. `0` turns the cap off.
 
 #### 5. Per-Line Memory
 The settings tab keeps independent settings for each dialect (`llamacpp`, `omlx`, `ninfer`, `tabbyapi`). Switching between server buttons automatically restores each server's specific port, model alias, and context size without re-entering them.
@@ -165,21 +166,22 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.2
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.3
 ```
 
 推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.2` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.3` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
 | DSH 宿主 | 插件版本 | 状态 |
 |---|---|---|
-| 0.2.0-rc.2 | `#v0.3.2` | 实测通过（生产） |
-| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.2` | 应可用 - 同一批缝，未实测 |
+| 0.2.1-alpha.1 起 | `#v0.3.3` | 实测通过（生产）；更老的插件 tag 在该宿主上每轮必炸（上游移除了内置 `{{cwd}}` 提示词变量） |
+| 0.2.0-rc.2 | `#v0.3.2` 或 `#v0.3.3` | 实测通过（生产）；v0.3.3 在其上只做减法，不要求宿主新功能 |
+| 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | 应可用 - 同一批缝，未实测 |
 | 0.1.6-alpha.2 及更早 | `#v0.2.0` | 支持线 |
 
 `main` 已面向 rc.2 缝批次；老宿主请钉 `#v0.2.0`。
@@ -190,7 +192,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.2
 # 1) 先把 DSH 宿主升到 0.2.0-rc.2 或更新（正常宿主更新）。
 # 2) 重钉插件（profile 目录；Windows：%USERPROFILE%\.dsh\profiles\web）：
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.2'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.3'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
 # 3) 重启 dsh web。已在用 qwen38 的会话无缝继续（同 id、新声明接管）。
@@ -260,8 +262,8 @@ DSH 设置 → **Qwen3.8 本地**：
 - **图片处理（`summarize.images`）**：
   - `strip`（推荐）：在旧轮次中移除大图并替换为简短占位文本，大幅节省上下文空间。
   - `keep`：在历史中保留原图。
-- **保留近期思考（`summarize.keepTurns`）**：压缩时保留最近多少轮助手的完整 `<think>` 思考过程（默认 5 轮）。更早轮次的思考过程会被裁掉（通常只需最终操作结果，无需保留早期心路历程）。
-- **工具输出截断（`summarize.toolChars`）**：历史中单次工具输出（如大段终端日志或文件读取）保留的最大字符数（默认 2000 字），防止巨量日志挤占宝贵的上下文。
+- **保留近期思考（`summarize.keepTurns`）**：压缩时保留最近多少轮助手的完整 `<think>` 思考过程（默认 5 轮）。更早轮次的思考过程会被裁掉（通常只需最终操作结果，无需保留早期心路历程）。填 `0` = 全部剥离。
+- **工具输出截断（`summarize.toolChars`）**：历史中单次工具输出（如大段终端日志或文件读取）保留的最大字符数（默认 2000 字），防止巨量日志挤占宝贵的上下文。填 `0` = 关闭截断。
 
 #### 5. 按线独立记忆
 设置 tab 为每种方言（`llamacpp`、`omlx`、`ninfer`、`tabbyapi`）保留独立的配置记忆。切换方言单选框会自动恢复该服务线的地址、模型名与窗口大小，无需反复重新填写。
