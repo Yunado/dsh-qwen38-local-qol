@@ -243,6 +243,13 @@ test('validateSection: negative summarize knobs fail loud', () => {
   assert.throws(() => validateSection(value), /summarize\.keepTurns must be/)
 })
 
+test('validateSection: zero trim knobs are accepted (their off modes, top level and per line)', () => {
+  const top = { ...sectionSchema()({}), summarize: { images: 'strip', keepTurns: 0, toolChars: 0 } }
+  assert.doesNotThrow(() => validateSection(top))
+  const perLine = { ...sectionSchema()({}), lines: { ninfer: { ...sectionSchema()({}).lines.ninfer, summarize: { images: 'strip', keepTurns: 0, toolChars: 0 } } } }
+  assert.doesNotThrow(() => validateSection(perLine))
+})
+
 test('sectionSchema: the compaction wiring status defaults to unset', () => {
   const resolved = sectionSchema()({})
   assert.deepEqual(resolved.compaction, { presetGenerated: false, defaultPreset: 'standard' })

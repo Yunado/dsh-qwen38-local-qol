@@ -70,7 +70,7 @@ const COPY = {
     compaction: 'Compaction prefill trim',
     summarizeImages: 'Images in the summarizer prefill',
     summarizeHint: 'Off strips images in the summarizer prefill to text placeholders (prefer with mmproj offload).',
-    keepTurns: 'Keep reasoning of the last N turns',
+    keepTurns: 'Keep reasoning of the last N turns (0 = strip all)',
     toolChars: 'Tool-result character cap (0 = off)',
     save: 'Save',
     saving: 'Saving…',
@@ -79,6 +79,7 @@ const COPY = {
     notFound: 'This plugin is not registered a settings section on the host side (restart DSH web after installing the plugin, then open this page again).',
     conflict: 'Someone else changed these settings while you were editing. Your edits were discarded; the current values are shown.',
     invalidNumber: 'Every number field must be a positive whole number.',
+    invalidTrim: 'Keep-turns and tool-result cap must be whole numbers (0 = off).',
     compactTrigger: 'Compaction trigger',
     compactTriggerHint: 'Automatic compaction fires at this percentage of the window. The slider also syncs the output cap to keep the point exact (the guard stays a quarter of that cap). At the current cap the guard is {guard} tokens.',
     invalidPct: 'Trigger percent must be a whole number 50..99.',
@@ -118,7 +119,7 @@ const COPY = {
     compaction: '压缩预填充裁剪',
     summarizeImages: '摘要预填充里的图片',
     summarizeHint: '关闭 = 摘要预填充里的图片替换为文本占位符（mmproj offload 时优选）。',
-    keepTurns: '保留最近 N 轮的 reasoning',
+    keepTurns: '保留最近 N 轮的 reasoning（0 = 全部剥离）',
     toolChars: '工具结果字数帽（0 = 关）',
     save: '保存',
     saving: '保存中…',
@@ -127,6 +128,7 @@ const COPY = {
     notFound: '宿主侧未注册该插件的设置命名空间（装完插件后重启 DSH web，再打开本页面）。',
     conflict: '编辑期间他人修改了这些设置。你的改动已丢弃，当前显示的是最新值。',
     invalidNumber: '所有数字字段必须是正整数。',
+    invalidTrim: '保留轮数与工具字数帽必须是非负整数（0 = 关）。',
     compactTrigger: '压缩触发点',
     compactTriggerHint: '自动压缩在窗口的该百分比处触发；滑杆同时联动输出上限以保证该点精确落地（墙护始终为该上限的 1/4）。当前上限对应的墙护为 {guard} token。',
     invalidPct: '触发比例必须是 50 到 99 的整数。',
@@ -414,13 +416,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
 
   const doSave = async () => {
     const { view, draft } = state
-    const numbers = [
-      draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh,
-      draft.defaultBudget, draft.keepTurns, draft.toolChars,
-      ...Object.values(draft.lines).flatMap((line) => [line.contextWindow, line.maxTokens, line.low, line.medium, line.xhigh, line.defaultThinkingBudget, line.keepTurns, line.toolChars]),
-    ]
-    if (numbers.some((text) => /^\d+$/.test(String(text)) === false || Number.parseInt(text, 10) <= 0)) {
-      setState((s) => ({ ...s, error: t.invalidNumber }))
+    const numberError = draftNumberError(draft)
+    if (numberError !== null) {
+      setState((s) => ({ ...s, error: t[numberError] }))
       return
     }
     const compactPct = Number.parseInt(draft.compactPct, 10)
@@ -788,6 +786,28 @@ export function apply(ctx) {
     },
     QwenLocalSectionEntry,
   ))
+}
+
+/**
+ * The save gate's number validation (exported for tests): the geometry and
+ * thinking-budget fields must be strictly positive, while the two trim knobs
+ * accept zero as their documented off mode (keepTurns 0 strips all reasoning,
+ * toolChars 0 lifts the tool-result cap; the backend implements both, so the
+ * tab must not outvote them - issue #4).
+ * @param draft - the tab draft.
+ * @returns the error dictionary key ("invalidNumber" or "invalidTrim"), or
+ * null when every number passes.
+ */
+export function draftNumberError(draft) {
+  const parkedLines = Object.values(draft.lines ?? {})
+  const positive = [
+    draft.contextWindow, draft.maxTokens, draft.low, draft.medium, draft.xhigh, draft.defaultBudget,
+    ...parkedLines.flatMap((line) => [line.contextWindow, line.maxTokens, line.low, line.medium, line.xhigh, line.defaultThinkingBudget]),
+  ]
+  if (positive.some((text) => /^\d+$/.test(String(text)) === false || Number.parseInt(text, 10) <= 0)) return 'invalidNumber'
+  const trims = [draft.keepTurns, draft.toolChars, ...parkedLines.flatMap((line) => [line.keepTurns, line.toolChars])]
+  if (trims.some((text) => /^\d+$/.test(String(text)) === false)) return 'invalidTrim'
+  return null
 }
 
 /** Plugin name, mirroring the host half. */

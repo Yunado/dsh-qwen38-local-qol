@@ -118,6 +118,22 @@ test('client: registers one settings.section page with a localized label', () =>
   assert.equal(typeof face.save, 'function')
 })
 
+test('draftNumberError: the trim knobs accept 0 (their documented off mode), geometry and budgets stay positive (issue #4)', () => {
+  const line = { contextWindow: '131072', maxTokens: '16384', low: '2048', medium: '4096', xhigh: '8192', defaultThinkingBudget: '8192', keepTurns: '5', toolChars: '2000' }
+  const draft = { contextWindow: '131072', maxTokens: '16384', low: '2048', medium: '4096', xhigh: '8192', defaultBudget: '8192', keepTurns: '5', toolChars: '2000', lines: { llamacpp: { ...line } } }
+  assert.equal(client.draftNumberError(draft), null)
+  // Zero is a valid mode for both knobs (toolChars 0 = no cap, keepTurns 0 =
+  // strip all reasoning): the backend implements both, the tab must not block.
+  assert.equal(client.draftNumberError({ ...draft, toolChars: '0' }), null)
+  assert.equal(client.draftNumberError({ ...draft, keepTurns: '0', toolChars: '0' }), null)
+  assert.equal(client.draftNumberError({ ...draft, lines: { llamacpp: { ...line, keepTurns: '0', toolChars: '0' } } }), null)
+  // The positive fields keep their gate; the knobs get their own message.
+  assert.equal(client.draftNumberError({ ...draft, contextWindow: '0' }), 'invalidNumber')
+  assert.equal(client.draftNumberError({ ...draft, maxTokens: '' }), 'invalidNumber')
+  assert.equal(client.draftNumberError({ ...draft, toolChars: '' }), 'invalidTrim')
+  assert.equal(client.draftNumberError({ ...draft, lines: { llamacpp: { ...line, keepTurns: 'x' } } }), 'invalidTrim')
+})
+
 test('client: the inject face loads the namespace view and writes with the held revision', async () => {
   const { ctx, updateCalls } = fakeCtx()
   let captured = null
