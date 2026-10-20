@@ -270,7 +270,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 
 ## 13. v0.3.x 发布态（DSH 0.2.0-rc.2 适配，2026-09-30）
 
-- **兼容声明**：tested = 0.2.0-rc.2 与 0.2.1-alpha.1/alpha.2（生产，v0.3.3 起）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
+- **兼容声明**：tested = 0.2.0-rc.2 与 0.2.1-alpha.1/alpha.2/rc.2（生产，v0.3.3 起；10-18 生产宿主升 `dsh-v0.2.1-rc.2`，preset/设置 tab/活动线三缝生产实跑，压缩后端首触发待自然观察）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
   ≤0.1.6-alpha.2 钉 v0.2.0。peer 钉 `^0.2.0-rc.2`；main 面向 rc.2 线。
   **0.2.1-alpha.1 起上游移除内置 `{{cwd}}` 提示词变量**（upgrade guide：working-directory），preset persona suffix
   曾手写该变量 → alpha 宿主上每轮请求组装 fail-closed（"unknown prompt variable"，生产实炸）；v0.3.3 删 suffix
