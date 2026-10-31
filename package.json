@@ -4,6 +4,7 @@
   "description": "DeepSeek Harness QoL plugin for the local Qwen3.8 line (27B, Flash-Next): per-request thinking budgets on llama.cpp, NInfer, TabbyAPI, and oMLX dialects, vision + tools, and a compaction backend whose summaries stop burning the output cap on thinking.",
   "type": "module",
   "license": "MIT",
+  "icon": "assets/icon.png",
   "author": "Yunado",
   "main": "src/index.js",
   "exports": {
@@ -18,6 +19,7 @@
     "src",
     "lib",
     "scripts",
+    "assets",
     "cordis.patch.yml",
     "presets",
     "README.md",

@@ -277,6 +277,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   （目录由宿主 working-directory 服务作为 user context 注入，手写子句既炸又冗余），plugin.test 加"仅允许
   provider/model 白名单变量"结构守卫。教训：宿主兼容核查 = 接口缝 diff **+ 本包文案对照上游 upgrade guide 的变量/键移除**，只看接口会漏。
 - **v0.3.4（0.2.2-alpha.2 适配，2026-10-30）**：上游 4df09d37d5（首个含该提交的宿主 tag = `dsh-v0.2.2-alpha.2`）把 `list_agents` 并入 `tool-subagent-control` 主插件并删除 `./list-agents` 子路径导出（官方 standard 名册同步删行）；v0.3.3 的 qwen38 preset 仍引用该导出，条目 never started，preset 整体挂载被拒（registry default=qwen38 时新建会话全炸）。v0.3.4 删该行，并把 tool-subagent 已移除的 `backgroundMode`/`modelSelectionSettings` 键换成现行的 `modelSelection` + `modelDiscovery`（旧键被 schema 静默过滤，症状 = 丢失逐子模型选择与 `list_subagent_models`）。教训：宿主升级除接口缝 diff 外必须对照上游 preset 名册与工具 Config 键变更（工具打包重构对第三方 preset 是 breaking，与 `{{cwd}}` 事故同类）；plugin.test 已加退役导出/键结构守卫。
+- **v0.3.5（插件图标，2026-10-31）**：`assets/icon.png`（256×256 PNG）+ package.json `icon` 字段；宿主 `app-boot/package-meta.ts` 读取规则 = 包内相对路径、SVG/PNG/JPEG/WebP、≤256KB，插件管理页与市场卡片展示。设计 = Qwen 官方花形 94% 占幅 + 中调靛蓝渐变（#7C86FF→#3D4BE8）、透明底无底板无角标，深浅主题对比全靠自发光中调图形（对齐官方插件 artwork 规范）；白色线稿源自 qwen-dark-white 压平版亮度→alpha 提取再着色。
 - **preset 全声明化**：`presets/qwen38.patch.yml`（bundle patch list 第二件）声明完整 roster、
   卡片文案（rc.2 单串双语 "A / B"）、registry default。setup.js/`~/.dsh/.agent-presets` 生成链退役
   （v0.2.0 用户升级后旧目录惰性无害，可删）。
