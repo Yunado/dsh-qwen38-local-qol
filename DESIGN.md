@@ -173,7 +173,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
     client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + 裁剪旋钮 + 压缩触发滑杆/帽联动）
     client-entry.js / client.css  # client 半区入口 + 样式
   lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行；改 src/client.js 后 scripts/build-client.mjs 重建并提交）
-  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（141 用例）
+  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（142 用例）
   docs/               # 六图（server/tab/preset × en/cn）
   README.md           # 中英双语：安装/四线/wire 说明/验证
   DESIGN.md           # 本稿
@@ -256,7 +256,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   preset + `default: qwen38` 注册行都随 patch insert，升级同 id 自动接管；GUI 选 qwen38 preset。
 - **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
-  值；热加载免重启；zh/en 双语。suite = 141 用例全绿。
+  值；热加载免重启；zh/en 双语。suite = 142 用例全绿。
 - **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
   llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024，
   NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
@@ -270,8 +270,8 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 
 ## 13. v0.3.x 发布态（DSH 0.2.0-rc.2 适配，2026-09-30）
 
-- **兼容声明**：tested = 0.2.0-rc.2 与 0.2.1-alpha.1/alpha.2/rc.2（生产，v0.3.3 起；10-18 生产宿主升 `dsh-v0.2.1-rc.2`，preset/设置 tab/活动线三缝生产实跑，压缩后端首触发待自然观察）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
-  ≤0.1.6-alpha.2 钉 v0.2.0。peer 钉 `^0.2.0-rc.2`；main 面向 rc.2 线。
+- **兼容声明**：tested = 0.2.0-rc.2 与 0.2.1-alpha.1/alpha.2/rc.2 与 0.2.2-alpha.2（生产，v0.3.3 起；10-18 生产宿主升 `dsh-v0.2.1-rc.2`，10-30 升 `dsh-v0.2.2-alpha.2`，preset/设置 tab/活动线三缝生产实跑，压缩后端首触发待自然观察）；0.1.7-alpha.1..0.2.0-rc.1 = 同缝批次应可用未实测；
+  ≤0.1.6-alpha.2 钉 v0.2.0。peer 钉 `^0.2.0-rc.2`；main 面向 0.2.2 名册线（v0.3.4 起）。
   **0.2.1-alpha.1 起上游移除内置 `{{cwd}}` 提示词变量**（upgrade guide：working-directory），preset persona suffix
   曾手写该变量 → alpha 宿主上每轮请求组装 fail-closed（"unknown prompt variable"，生产实炸）；v0.3.3 删 suffix
   （目录由宿主 working-directory 服务作为 user context 注入，手写子句既炸又冗余），plugin.test 加"仅允许

@@ -34,7 +34,7 @@ You can also pin a specific release: add a tag to the spec (`#v0.3.4` or any pas
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | should work - same seam batch, not exercised |
 | 0.1.6-alpha.2 and older | `#v0.2.0` | supported line |
 
-`main` targets the rc.2 seam batch; stay on `#v0.2.0` with older hosts.
+`main` targets the 0.2.2-era preset roster; stay on `#v0.2.0` with older hosts.
 
 Upgrading from v0.2.0 (host first, then plugin):
 
@@ -186,7 +186,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | 应可用 - 同一批缝，未实测 |
 | 0.1.6-alpha.2 及更早 | `#v0.2.0` | 支持线 |
 
-`main` 已面向 rc.2 缝批次；老宿主请钉 `#v0.2.0`。
+`main` 已面向 0.2.2 宿主名册；老宿主请钉 `#v0.2.0`。
 
 从 v0.2.0 升级（先升宿主，再升插件）：
 
