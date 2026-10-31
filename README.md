@@ -15,7 +15,7 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.3
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
 ```
 
 Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
@@ -167,14 +167,14 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.3
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
 ```
 
 推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.3` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.4` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
