@@ -274,3 +274,24 @@ test('preset patch: references only prompt variables the host still registers', 
     assert.ok(['provider', 'model'].includes(variable), `preset must not reference the removed prompt variable {{${variable}}}`)
   }
 })
+
+test('preset patch: no references to host surfaces retired in 0.2.2-alpha.2', () => {
+  // Upstream 4df09d37d5 (first shipped in host tag dsh-v0.2.2-alpha.2) merged
+  // list_agents into the control plugin and deleted the
+  // '@deepseek-ai/dsh-tool-subagent-control/list-agents' export; a roster row
+  // that resolves to nothing never starts and the whole preset mount is
+  // rejected (agent-preset/invalid ... never started). tool-subagent also
+  // retired backgroundMode and modelSelectionSettings for modelSelection +
+  // modelDiscovery. This guard pins the 2026-10 host drift: a future roster
+  // re-sync must not reintroduce the retired exports or config keys.
+  const preset = readFileSync(new URL('../presets/qwen38.patch.yml', import.meta.url), 'utf8')
+  for (const retired of [
+    '@deepseek-ai/dsh-tool-subagent-control/list-agents',
+    'backgroundMode:',
+    'modelSelectionSettings:',
+  ]) {
+    assert.ok(!preset.includes(retired), `preset must not reference the retired host surface ${retired}`)
+  }
+  assert.match(preset, /modelSelection: true/)
+  assert.match(preset, /modelDiscovery: true/)
+})
