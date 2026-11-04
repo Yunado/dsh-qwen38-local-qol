@@ -15,20 +15,20 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.5
 ```
 
 Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.3.4` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
+You can also pin a specific release: add a tag to the spec (`#v0.3.5` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
 
 ## DSH compatibility
 
 | DSH host | Plugin | Status |
 |---|---|---|
-| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.4` | tested (production); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
+| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.5` | tested (production, first on `#v0.3.4`); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
 | 0.2.1-alpha.1 - 0.2.2-alpha.1 (production ran 0.2.1-rc.2) | `#v0.3.3` | tested (production, 0.2.1-alpha.1 and 0.2.1-rc.2); older plugin tags fail every turn there, the host removed the built-in `{{cwd}}` prompt variable |
 | 0.2.0-rc.2 | `#v0.3.2` or `#v0.3.3` | tested (production); v0.3.3 only removes content on top, no new host requirements |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | should work - same seam batch, not exercised |
@@ -42,7 +42,7 @@ Upgrading from v0.2.0 (host first, then plugin):
 # 1) update the DSH host to 0.2.0-rc.2 or newer (normal host update).
 # 2) re-pin the plugin (profile dir; Windows: %USERPROFILE%\.dsh\profiles\web):
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.4'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.5'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
 # 3) restart dsh web. Sessions already on qwen38 keep working (same id, new
@@ -167,20 +167,20 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.5
 ```
 
 推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.4` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.5` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
 | DSH 宿主 | 插件版本 | 状态 |
 |---|---|---|
-| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.4` | 实测通过（生产）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
+| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.5` | 实测通过（生产，先跑 `#v0.3.4`）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
 | 0.2.1-alpha.1 - 0.2.2-alpha.1（生产曾实跑 0.2.1-rc.2） | `#v0.3.3` | 实测通过（生产，0.2.1-alpha.1 与 0.2.1-rc.2）；更老的插件 tag 在该宿主上每轮必炸（上游移除了内置 `{{cwd}}` 提示词变量） |
 | 0.2.0-rc.2 | `#v0.3.2` 或 `#v0.3.3` | 实测通过（生产）；v0.3.3 在其上只做减法，不要求宿主新功能 |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | 应可用 - 同一批缝，未实测 |
@@ -194,7 +194,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.4
 # 1) 先把 DSH 宿主升到 0.2.0-rc.2 或更新（正常宿主更新）。
 # 2) 重钉插件（profile 目录；Windows：%USERPROFILE%\.dsh\profiles\web）：
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.4'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.5'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
 # 3) 重启 dsh web。已在用 qwen38 的会话无缝继续（同 id、新声明接管）。

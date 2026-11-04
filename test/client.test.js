@@ -55,6 +55,12 @@ function fakeCtx(overrides = {}) {
           return { ok: true, value: state.namespaces[index] }
         },
       },
+      agentPresets: {
+        list: async () => (overrides.roster !== undefined ? overrides.roster : {
+          ok: true,
+          value: { presets: [{ id: 'standard', isDefault: true }, { id: 'qwen38', isDefault: false }] },
+        }),
+      },
     },
   }
   return { ctx, describeCalls, updateCalls, state, registrations: { list: [] } }
@@ -94,7 +100,38 @@ test('client: the load face reports the agent-presets default for the status act
   client.apply(ctx)
   const loaded = await captured.load()
   assert.equal(loaded.ok, true)
-  assert.deepEqual(loaded.agentPresets, { revision: 3, defaultPreset: 'standard' })
+  assert.deepEqual(loaded.agentPresets, { defaultPreset: 'standard' })
+})
+
+test('client: the effective default comes from the roster isDefault row', async () => {
+  const { ctx } = fakeCtx({ roster: { ok: true, value: { presets: [{ id: 'standard', isDefault: false }, { id: 'qwen38', isDefault: true }] } } })
+  let captured = null
+  ctx.slots.register = (option) => { captured = option.inject() }
+  client.apply(ctx)
+  const loaded = await captured.load()
+  assert.deepEqual(loaded.agentPresets, { defaultPreset: 'qwen38' })
+})
+
+test('client: a refused or ownerless roster reads as unknown, never a fabricated preset', async () => {
+  for (const roster of [
+    { ok: false, error: { code: 'gateway/invocation-unavailable', message: 'no service' } },
+    { ok: true, value: { presets: [{ id: 'standard', isDefault: false }] } },
+  ]) {
+    const { ctx } = fakeCtx({ roster })
+    let captured = null
+    ctx.slots.register = (option) => { captured = option.inject() }
+    client.apply(ctx)
+    const loaded = await captured.load()
+    assert.equal(loaded.ok, true)
+    assert.equal(loaded.agentPresets?.defaultPreset ?? null, null)
+  }
+})
+
+test('client: an unknown effective default renders neutral copy and a grey dot', () => {
+  const t = { compactionNotSet: 'not-set', compactionActive: 'active', compactionAvailable: 'available: {default}', compactionUnknown: 'unknown' }
+  assert.equal(client.compactionStatusCopy({ presetGenerated: true, defaultPreset: null }, t), 'unknown')
+  assert.equal(client.compactionStatusCopy({ presetGenerated: true }, t), 'unknown')
+  assert.equal(client.compactionStatusState({ presetGenerated: true, defaultPreset: null }), 'idle')
 })
 
 test('client: registers one settings.section page with a localized label', () => {

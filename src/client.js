@@ -89,6 +89,7 @@ const COPY = {
     compactionNotSet: 'The qwen38 preset is not declared by the installed plugin bundle (reinstall or update the plugin, then restart dsh web).',
     compactionActive: 'Local compaction is active for new sessions (default preset: qwen38).',
     compactionAvailable: 'Local compaction is available, but the default preset is "{default}" — new sessions use standard compaction. Select qwen38 on the Agent presets page to enable it.',
+    compactionUnknown: 'Compaction backend is mounted; the effective default preset could not be read. Check the badge on the Agent presets page.',
     compactionHint: 'The trim controls apply to sessions using the qwen38 preset.',
   },
   zh: {
@@ -138,6 +139,7 @@ const COPY = {
     compactionNotSet: 'qwen38 预设未由已安装的插件 bundle 声明（重装或更新插件后重启 dsh web）。',
     compactionActive: '本地压缩对新会话生效（默认预设：qwen38）。',
     compactionAvailable: '本地压缩可用，但默认预设是 "{default}"——新会话走标准压缩。在 Agent 预设页选择 qwen38 启用。',
+    compactionUnknown: '压缩后端已挂载；默认预设的生效值暂时读不到，以 Agent 预设页徽标为准。',
     compactionHint: '裁剪设置仅对 qwen38 预设的会话生效。',
   },
 }
@@ -153,6 +155,7 @@ const COPY = {
 export function compactionStatusCopy(status, t) {
   if (status === undefined || status.presetGenerated !== true) return t.compactionNotSet
   if (status.defaultPreset === PRESET_ID) return t.compactionActive
+  if (status.defaultPreset === null || status.defaultPreset === undefined) return t.compactionUnknown
   return t.compactionAvailable.replace('{default}', String(status.defaultPreset))
 }
 
@@ -167,6 +170,7 @@ export function compactionStatusCopy(status, t) {
 export function compactionStatusState(status) {
   if (status === undefined || status.presetGenerated !== true) return 'idle'
   if (status.defaultPreset === PRESET_ID) return 'done'
+  if (status.defaultPreset === null || status.defaultPreset === undefined) return 'idle'
   return 'warning'
 }
 
@@ -547,7 +551,10 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   // live default preset is qwen38 - read from the registry row, no restart.
   const compaction = {
     presetGenerated: true,
-    defaultPreset: state.agentPresets?.defaultPreset ?? view.value.compaction?.defaultPreset ?? 'standard',
+    // null: the preset roster was unreadable or carries no default row. The
+    // status line stays neutral; a locally configured preset id is never
+    // passed off as an observed effective default.
+    defaultPreset: state.agentPresets?.defaultPreset ?? null,
   }
   const ninfer = draft.dialect === 'ninfer'
   // Trigger slider: the percent IS the compaction point. Dragging it also
@@ -753,15 +760,18 @@ export function apply(ctx) {
           if (response.ok !== true) return { ok: false, error: response.error.message }
           const view = response.value.namespaces.find((entry) => entry.ns === NS)
           if (view === undefined) return { ok: false, error: 'ns-missing' }
-          // The preset registry row: the volatile `selectedDefault` (a user pick
-          // on the Agent presets page) wins over the deployment `default` our
-          // bundle patch points at qwen38.
-          const presets = response.value.namespaces.find((entry) => entry.ns === 'agent-preset-registry')
-          return {
-            ok: true,
-            value: view,
-            agentPresets: presets === undefined ? null : { revision: presets.revision, defaultPreset: presets.value?.selectedDefault ?? presets.value?.default ?? null },
-          }
+          // The effective default preset, read from the same roster the Agent
+          // presets page marks with its badge (registry `selectedDefault ??
+          // default`, surfaced as the isDefault row). A refused or ownerless
+          // roster reads as null and the status line renders neutral copy.
+          let agentPresets = null
+          try {
+            const roster = await ctx.remote.agentPresets.list()
+            if (roster.ok === true) {
+              agentPresets = { defaultPreset: roster.value.presets.find((row) => row.isDefault === true)?.id ?? null }
+            }
+          } catch { /* the host exposes no agent-presets service; stay neutral */ }
+          return { ok: true, value: view, agentPresets }
         },
         save: async (view, patch) => {
           const response = await ctx.remote.settings.update(NS, patch, view.revision)
