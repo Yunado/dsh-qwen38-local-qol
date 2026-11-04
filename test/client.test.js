@@ -63,6 +63,9 @@ function fakeCtx(overrides = {}) {
       },
     },
   }
+  // The scoped-proxy semantics the load face relies on: dotted services resolve
+  // only through the strict get, and an unknown service answers undefined.
+  ctx.get = (service) => (service === 'remote.agentPresets' ? ctx.remote.agentPresets : undefined)
   return { ctx, describeCalls, updateCalls, state, registrations: { list: [] } }
 }
 
@@ -132,6 +135,26 @@ test('client: an unknown effective default renders neutral copy and a grey dot',
   assert.equal(client.compactionStatusCopy({ presetGenerated: true, defaultPreset: null }, t), 'unknown')
   assert.equal(client.compactionStatusCopy({ presetGenerated: true }, t), 'unknown')
   assert.equal(client.compactionStatusState({ presetGenerated: true, defaultPreset: null }), 'idle')
+})
+
+test('client: the roster is read through the strict get, an absent service stays unknown', async () => {
+  // The scoped proxy hides services the plugin did not declare, so the load
+  // face resolves the roster through the strict get.
+  const found = fakeCtx()
+  let captured = null
+  found.ctx.slots.register = (option) => { captured = option.inject() }
+  client.apply(found.ctx)
+  const viaGet = await captured.load()
+  assert.deepEqual(viaGet.agentPresets, { defaultPreset: 'standard' })
+  // With no service in the global store, the same read lands in the unknown state.
+  const absent = fakeCtx()
+  absent.ctx.get = () => undefined
+  let capturedAbsent = null
+  absent.ctx.slots.register = (option) => { capturedAbsent = option.inject() }
+  client.apply(absent.ctx)
+  const viaAbsent = await capturedAbsent.load()
+  assert.equal(viaAbsent.ok, true)
+  assert.equal(viaAbsent.agentPresets, null)
 })
 
 test('client: registers one settings.section page with a localized label', () => {

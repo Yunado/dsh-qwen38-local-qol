@@ -760,17 +760,23 @@ export function apply(ctx) {
           if (response.ok !== true) return { ok: false, error: response.error.message }
           const view = response.value.namespaces.find((entry) => entry.ns === NS)
           if (view === undefined) return { ok: false, error: 'ns-missing' }
-          // The effective default preset, read from the same roster the Agent
-          // presets page marks with its badge (registry `selectedDefault ??
-          // default`, surfaced as the isDefault row). A refused or ownerless
-          // roster reads as null and the status line renders neutral copy.
+          // The preset roster service is optional here, so it is read with the
+          // strict `ctx.get` (the scoped ctx proxy strips services the plugin did
+          // not declare in `inject`, so `ctx.remote.agentPresets` is undefined
+          // even where the gateway mounted it). The roster's `isDefault` row is
+          // the same fact the Agent presets page marks with its badge (registry
+          // `selectedDefault ?? default`); an absent service or a refused or
+          // ownerless roster reads as null and the status line renders neutral copy.
           let agentPresets = null
           try {
-            const roster = await ctx.remote.agentPresets.list()
-            if (roster.ok === true) {
-              agentPresets = { defaultPreset: roster.value.presets.find((row) => row.isDefault === true)?.id ?? null }
+            const rosterService = ctx.get('remote.agentPresets') ?? ctx.get('remote.agent-presets')
+            if (rosterService !== undefined) {
+              const roster = await rosterService.list()
+              if (roster.ok === true) {
+                agentPresets = { defaultPreset: roster.value.presets.find((row) => row.isDefault === true)?.id ?? null }
+              }
             }
-          } catch { /* the host exposes no agent-presets service; stay neutral */ }
+          } catch { /* the roster read threw; the status line stays unknown */ }
           return { ok: true, value: view, agentPresets }
         },
         save: async (view, patch) => {
@@ -823,5 +829,5 @@ export function draftNumberError(draft) {
 /** Plugin name, mirroring the host half. */
 export const name = 'qwen38-local-qol'
 
-/** Hard client dependencies. `remote` and the dotted `remote.settings` are Cordis client services — the gateway provides each Remote namespace under its dotted name, and the ctx proxy resolves `ctx.remote.settings` against that one; an undeclared service is absent from the plugin's ctx. */
+/** Hard client dependencies. `remote` and the dotted `remote.settings` are Cordis client services - the gateway provides each Remote namespace under its dotted name, and the ctx proxy resolves `ctx.remote.settings` against that one; an undeclared service is absent from the plugin's ctx. Optional services (the `remote.agentPresets` roster) are therefore read with the strict `ctx.get`, which bypasses the scoped proxy and answers undefined when the service is absent; declaring them here would make the fiber wait on a service this plugin can live without. */
 export const inject = ['slots', 'locale', 'remote', 'remote.settings']
