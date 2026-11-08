@@ -35,6 +35,9 @@ test('validateSection: an out-of-range compaction trigger fails loud', () => {
 test('validateSection: every thinking budget must keep the answer a room of 8192 under the cap', () => {
   // Top level: a budget may not crowd the answer under the reserve; refused
   // at the write (the Anthropic-style fail-loud on budget_tokens vs max_tokens).
+  // The shipped starter defaults must pass on the exact edge: cap 16384 -
+  // xhigh 8192 = 8192 (a future reserve raise must trip here first).
+  validateSection({ maxTokens: 16384, thinkingBudgets: { low: 2048, medium: 4096, xhigh: 8192 }, defaultThinkingBudget: 8192 })
   assert.throws(() => validateSection({ maxTokens: 20480, thinkingBudgets: { xhigh: 32768 } }), /thinkingBudgets\["xhigh"\]/)
   assert.throws(() => validateSection({ maxTokens: 15000, thinkingBudgets: { xhigh: 12000 } }), /thinkingBudgets\["xhigh"\]/)
   assert.throws(() => validateSection({ maxTokens: 16384, thinkingBudgets: { low: 4096 }, defaultThinkingBudget: 12289 }), /defaultThinkingBudget/)
