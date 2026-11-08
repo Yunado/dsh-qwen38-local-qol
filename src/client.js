@@ -83,8 +83,8 @@ const COPY = {
     compactTrigger: 'Compaction trigger',
     compactTriggerHint: 'Automatic compaction fires at this percentage of the window. The slider also syncs the output cap to keep the point exact (the guard stays a quarter of that cap). At the current cap the guard is {guard} tokens.',
     invalidPct: 'Trigger percent must be a whole number 50..99.',
-    budgetCap: 'Every thinking budget must keep 8192 tokens of the output cap free for the answer (thinking and answers share the cap): raise the cap or lower the budget.',
     textRoom: 'Room the visible answer keeps inside the output cap, per effort: {ledger}.',
+    budgetCapLine: '{line}: {term} ({budget}) leaves only {room} tokens of the output cap {cap} for the answer; at least 8192 must stay free (thinking and answers share the cap). Lower that budget or raise that line\'s cap.',
     squeezeBlocked: 'This point needs the output cap at or below {cap}, which cuts into the thinking budgets. Lower a thinking budget, or move the slider down, before saving.',
     remoteError: 'Settings request failed: ',
     compactionNotSet: 'The qwen38 preset is not declared by the installed plugin bundle (reinstall or update the plugin, then restart dsh web).',
@@ -134,8 +134,8 @@ const COPY = {
     compactTrigger: '压缩触发点',
     compactTriggerHint: '自动压缩在窗口的该百分比处触发；滑杆同时联动输出上限以保证该点精确落地（墙护始终为该上限的 1/4）。当前上限对应的墙护为 {guard} token。',
     invalidPct: '触发比例必须是 50 到 99 的整数。',
-    budgetCap: '每档 thinking 预算必须给正文在输出上限内留出至少 8192 token（思考与回答共用同一个帽）：请提高上限或下调预算。',
     textRoom: '输出上限内、扣除该档思考预算后正文可写的空间：{ledger}。',
+    budgetCapLine: '{line} 线：{term}（{budget}）在输出上限 {cap} 下只剩 {room} token 给正文，至少需保留 8192（思考与回答共用同一个帽）。请下调该预算或提高该线上限。',
     squeezeBlocked: '该触发点需要把输出上限降到 {cap} 以下，这会挤占 thinking 预算。请先调低某档 thinking 预算，或把滑杆调低，再保存。',
     remoteError: '设置请求失败：',
     compactionNotSet: 'qwen38 预设未由已安装的插件 bundle 声明（重装或更新插件后重启 dsh web）。',
@@ -265,6 +265,56 @@ export function compactionCapSync(windowTokens, pct, maxThinkingBudget) {
   const room = Number.isInteger(maxThinkingBudget) && maxThinkingBudget > 0 ? maxThinkingBudget + TEXT_RESERVE_TOKENS : 1024
   const red = neededCap < room
   return { cap: red ? Math.min(room, windowTokens - 1) : neededCap, neededCap, red }
+}
+
+/**
+ * The answer-room guard for one line, judging the numbers as given (the tab
+ * passes the values a save WOULD write, never a stale parked copy): the first
+ * budget that breaks `budget + TEXT_RESERVE_TOKENS <= cap`, or null when all
+ * keep the answer's room.
+ * @param capText - the line's output cap (draft string).
+ * @param budgetPairs - [{ term, text }] in check order (efforts, then the default).
+ * @returns { term, budget, cap, room } for the first violation, or null.
+ */
+export function findBudgetCapViolation(capText, budgetPairs) {
+  const cap = Number.parseInt(capText, 10)
+  if (!Number.isInteger(cap) || cap <= 0) return null
+  for (const { term, text } of budgetPairs) {
+    const budget = Number.parseInt(text, 10)
+    if (!Number.isInteger(budget)) continue
+    if (budget + TEXT_RESERVE_TOKENS > cap) return { term, budget, cap, room: cap - budget }
+  }
+  return null
+}
+
+/** The guard's budget pairs of one draft record (flat top or parked line). */
+export function budgetPairsOf(record) {
+  const defaultBudget = record.defaultBudget ?? record.defaultThinkingBudget
+  return [
+    { term: 'low', text: record.low },
+    { term: 'medium', text: record.medium },
+    { term: 'xhigh', text: record.xhigh },
+    { term: 'defaultThinkingBudget', text: defaultBudget },
+  ]
+}
+
+/**
+ * Which lines' numbers currently fail the answer-room guard (the line
+ * selector's red dots). The active dialect is judged by the live flat inputs
+ * - what saving would write -; parked lines by their stored records.
+ * @param draft - the tab draft.
+ * @returns { [dialect]: violation } for the offending lines only.
+ */
+export function findLineViolations(draft) {
+  const violations = {}
+  for (const name of ['llamacpp', 'ninfer', 'tabbyapi', 'omlx']) {
+    const isActive = name === draft.dialect
+    const record = isActive ? draft : draft.lines?.[name]
+    if (record === undefined || record === null) continue
+    const violation = findBudgetCapViolation(record.maxTokens, budgetPairsOf(record))
+    if (violation !== null) violations[name] = violation
+  }
+  return violations
 }
 
 /**
@@ -398,12 +448,12 @@ function liftedInputs(record) {
 function QwenLocalSectionEntry({ useLocale, load, save }) {
   const locale = useLocale((snapshot) => (snapshot.active === 'zh' ? 'zh' : 'en'))
   const t = COPY[locale]
-  const [state, setState] = React.useState({ status: 'loading', error: null, view: null, draft: null, busy: false, saved: false, agentPresets: null })
+  const [state, setState] = React.useState({ status: 'loading', error: null, guardError: null, view: null, draft: null, busy: false, saved: false, agentPresets: null })
   // Password-style display for the API key: masked by default, the eye button
   // toggles between revealing and concealing the stored value.
   const [revealedKey, setRevealedKey] = React.useState(false)
 
-  const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false }))
+  const setDraft = (patch) => setState((s) => ({ ...s, draft: s.draft === null ? s.draft : { ...s.draft, ...patch }, saved: false, guardError: null }))
 
   // Switching the server line: the flat inputs take the target line's parked
   // record, so each line remembers its own values across switches and back.
@@ -414,16 +464,26 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       return {
         ...s,
         saved: false,
+        guardError: null,
         draft: { ...d, dialect: next, ...liftedInputs(d.lines[next]) },
       }
     })
   }
 
+  // The named copy of one guard violation: line, field and numbers, matching
+  // the server message's information content (it always named its culprit).
+  const violationCopy = (lineName, v) => t.budgetCapLine
+    .replaceAll('{line}', lineName)
+    .replaceAll('{term}', v.term)
+    .replaceAll('{budget}', v.budget.toLocaleString('en-US'))
+    .replaceAll('{cap}', v.cap.toLocaleString('en-US'))
+    .replaceAll('{room}', v.room.toLocaleString('en-US'))
+
   React.useEffect(() => {
     let alive = true
     load().then((result) => {
       if (!alive) return
-      if (result.ok) setState({ status: 'ready', error: null, view: result.value, draft: toDraft(result.value.value), busy: false, saved: false, agentPresets: result.agentPresets ?? null })
+      if (result.ok) setState({ status: 'ready', error: null, guardError: null, view: result.value, draft: toDraft(result.value.value), busy: false, saved: false, agentPresets: result.agentPresets ?? null })
       else setState({ status: 'error', error: result.ok === false && result.error === 'ns-missing' ? t.notFound : result.error, view: null, draft: null, busy: false, saved: false })
     }).catch((error) => {
       if (!alive) return
@@ -437,22 +497,23 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     const { view, draft } = state
     const numberError = draftNumberError(draft)
     if (numberError !== null) {
-      setState((s) => ({ ...s, error: t[numberError] }))
+      setState((s) => ({ ...s, error: null, guardError: t[numberError] }))
       return
     }
     const compactPct = Number.parseInt(draft.compactPct, 10)
     if (!Number.isInteger(compactPct) || compactPct < 50 || compactPct > 99) {
-      setState((s) => ({ ...s, error: t.invalidPct }))
+      setState((s) => ({ ...s, error: null, guardError: t.invalidPct }))
       return
     }
-    // Preset-style cross check (mirrors the server's `validateSection`): every
-    // effort's thinking budget (and the default) shares the line's output cap,
-    // so each must keep the answer's room free under it.
-    const budgetsFit = (capText, budgetTexts) => budgetTexts.every((text) => Number.parseInt(text, 10) + TEXT_RESERVE_TOKENS <= Number.parseInt(capText, 10))
-    const activeFits = budgetsFit(draft.maxTokens, [draft.low, draft.medium, draft.xhigh, draft.defaultBudget])
-    const linesFit = Object.values(draft.lines).every((line) => budgetsFit(line.maxTokens, [line.low, line.medium, line.xhigh, line.defaultThinkingBudget]))
-    if (!activeFits || !linesFit) {
-      setState((s) => ({ ...s, error: t.budgetCap }))
+    // Answer-room guard (mirrors the server's `validateSection`, same scope):
+    // it judges the NEXT STATE - the values this save would write (the flat
+    // inputs, mirrored to the top level and the active line). Parked remote
+    // lines can no longer block this save; their violations surface as red
+    // dots on the line selector instead, and the check catches them the
+    // moment one becomes the active line.
+    const guard = findBudgetCapViolation(draft.maxTokens, budgetPairsOf(draft))
+    if (guard !== null) {
+      setState((s) => ({ ...s, error: null, guardError: violationCopy(draft.dialect, guard) }))
       return
     }
     // The slider keeps the trigger point exact by syncing the output cap to
@@ -463,10 +524,10 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     const maxBudget = Math.max(0, ...[draft.low, draft.medium, draft.xhigh, draft.defaultBudget].map((text) => Number.parseInt(text, 10)))
     const room = maxBudget > 0 ? maxBudget + TEXT_RESERVE_TOKENS : 1024
     if (neededCap < room) {
-      setState((s) => ({ ...s, error: t.squeezeBlocked.replace('{cap}', neededCap.toLocaleString('en-US')) }))
+      setState((s) => ({ ...s, error: null, guardError: t.squeezeBlocked.replace('{cap}', neededCap.toLocaleString('en-US')) }))
       return
     }
-    setState((s) => ({ ...s, busy: true, error: null }))
+    setState((s) => ({ ...s, busy: true, error: null, guardError: null }))
     // The top-level fields are what the adapter and the compaction backend
     // read (the active line); `lines` persists every line's connection, window
     // numbers, the thinking budget, the trim knobs, AND the trigger percent
@@ -514,7 +575,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       toolChars: draft.toolChars,
       compactPct: draft.compactPct,
     }
-    const persistedLines = { ...draft.lines, [draft.dialect]: activeRecord }
+    // Sparse write (the host deep-merges): only the active line's block rides
+    // the patch, so a save from one tab can never carry another line's stale
+    // copy back over it. Parked lines stay untouched until their own tab saves.
     const patch = {
       dialect: draft.dialect,
       baseURL: draft.baseURL,
@@ -523,10 +586,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       // The credential rides the section top level, not a line record.
       apiKey: draft.apiKey,
       lines: {
-        ninfer: lineBlock(persistedLines.ninfer),
-        llamacpp: lineBlock(persistedLines.llamacpp),
-        tabbyapi: lineBlock(persistedLines.tabbyapi),
-        omlx: lineBlock(persistedLines.omlx),
+        [draft.dialect]: lineBlock(activeRecord),
       },
       contextWindow: Number.parseInt(draft.contextWindow, 10),
       maxTokens: Number.parseInt(draft.maxTokens, 10),
@@ -548,7 +608,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       setState((s) => ({ ...s, busy: false, saved: true, view: result.value, draft: toDraft(result.value.value) }))
     } else if (result.code === 'settings-conflict') {
       const fresh = await load()
-      if (fresh.ok) setState({ status: 'ready', error: t.conflict, view: fresh.value, draft: toDraft(fresh.value.value), busy: false, saved: false, agentPresets: fresh.agentPresets ?? null })
+      if (fresh.ok) setState({ status: 'ready', error: t.conflict, guardError: null, view: fresh.value, draft: toDraft(fresh.value.value), busy: false, saved: false, agentPresets: fresh.agentPresets ?? null })
       else setState((s) => ({ ...s, busy: false, error: t.remoteError + fresh.error }))
     } else {
       setState((s) => ({ ...s, busy: false, error: t.remoteError + result.error }))
@@ -596,6 +656,9 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
   // the budget room), label the clamped point's effective ratio.
   const budgetClamped = geometryOk && triggerTokens < Math.floor((windowTokens * sliderPct) / 100)
   const labelPct = budgetClamped ? Math.floor((triggerTokens * 100) / windowTokens) : sliderPct
+  // Which lines' parked numbers currently fail the answer-room guard; the
+  // selector flags them so a remote problem is visible without a refused save.
+  const lineViolations = findLineViolations(draft)
   return React.createElement('div', { className: 'qol' },
     React.createElement('h2', { className: 'qol-title' }, t.title),
     // Server line: the headline control — it switches the thinking wire for
@@ -612,6 +675,13 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
               onChange: () => { switchDialect(dialect) },
             }),
             dialect === 'ninfer' ? t.dialectNinfer : dialect === 'tabbyapi' ? t.dialectTabbyapi : dialect === 'omlx' ? t.dialectOmlx : t.dialectLlamacpp,
+            lineViolations[dialect] !== undefined
+              ? React.createElement('span', {
+                className: 'qol-error',
+                title: violationCopy(dialect, lineViolations[dialect]),
+                style: { color: '#e5484d', marginLeft: '0.4em', cursor: 'help' },
+              }, '\u25CF')
+              : null,
           ),
         ),
       ),
@@ -754,9 +824,11 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     ),
     // Save errors ride directly above the save button (the page is long; an
     // error parked under the title scrolls out of sight exactly when the user
-    // needs it). The slider's own red checker stays where it is.
-    state.error !== null
-      ? React.createElement('p', { className: 'qol-error', role: 'alert' }, state.error)
+    // needs it). The slider's own red checker stays where it is. Guard-class
+    // refusals (the answer-room check, the slider squeeze) clear as soon as
+    // any input changes; remote/conflict errors ride until the next save.
+    state.error !== null || state.guardError !== null
+      ? React.createElement('p', { className: 'qol-error', role: 'alert' }, state.error ?? state.guardError)
       : null,
     React.createElement('div', { className: 'qol-footer' },
       React.createElement(Button, { variant: 'primary', disabled: state.busy, onClick: () => { void doSave() } }, state.busy ? t.saving : t.save),

@@ -15,20 +15,20 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.7
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.8
 ```
 
 Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.3.7` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
+You can also pin a specific release: add a tag to the spec (`#v0.3.8` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
 
 ## DSH compatibility
 
 | DSH host | Plugin | Status |
 |---|---|---|
-| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.7` | tested (production, first on `#v0.3.4`); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
+| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.8` | tested (production, first on `#v0.3.4`); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
 | 0.2.1-alpha.1 - 0.2.2-alpha.1 (production ran 0.2.1-rc.2) | `#v0.3.3` | tested (production, 0.2.1-alpha.1 and 0.2.1-rc.2); older plugin tags fail every turn there, the host removed the built-in `{{cwd}}` prompt variable |
 | 0.2.0-rc.2 | `#v0.3.2` or `#v0.3.3` | tested (production); v0.3.3 only removes content on top, no new host requirements |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | should work - same seam batch, not exercised |
@@ -42,7 +42,7 @@ Upgrading from v0.2.0 (host first, then plugin):
 # 1) update the DSH host to 0.2.0-rc.2 or newer (normal host update).
 # 2) re-pin the plugin (profile dir; Windows: %USERPROFILE%\.dsh\profiles\web):
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.7'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.8'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
 # 3) restart dsh web. Sessions already on qwen38 keep working (same id, new
@@ -109,7 +109,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 #### 4. History Compaction & Trimming
 When conversations approach the context window limit, Harness compresses older history into summaries:
-- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The percent is a line field: each server line remembers its own slider position (moved from its tab, saved into its `lines` block), and the active line's value is mirrored to the top level where the compaction backend reads it. A line without its own percent inherits the top-level one, so profiles from the single-global-percent era keep their setting untouched. The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must keep at least 8,192 tokens of the output cap free for the visible answer; the tab shows the per-effort answer room under the budget fields and refuses the save otherwise. Compaction calls do not crowd that room: their caps are derived per call from the window. Current usage lives in the chat page's top meter.
+- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The percent is a line field: each server line remembers its own slider position (moved from its tab, saved into its `lines` block), and the active line's value is mirrored to the top level where the compaction backend reads it. A line without its own percent inherits the top-level one, so profiles from the single-global-percent era keep their setting untouched. The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must keep at least 8,192 tokens of the output cap free for the visible answer; the tab shows the per-effort answer room under the budget fields and refuses the save otherwise, naming the offending line, field and numbers. The guard judges only the live numbers: the top level and the active line. A parked remote line holding a stale combination never blocks another tab's save; it carries a red dot on the line selector until its own tab fixes it, and saving sends a sparse patch that touches only the top level and the active line. Compaction calls do not crowd that room: their caps are derived per call from the window. Current usage lives in the chat page's top meter.
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
@@ -168,20 +168,20 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.7
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.8
 ```
 
 推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.7` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.8` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
 | DSH 宿主 | 插件版本 | 状态 |
 |---|---|---|
-| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.7` | 实测通过（生产，先跑 `#v0.3.4`）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
+| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.8` | 实测通过（生产，先跑 `#v0.3.4`）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
 | 0.2.1-alpha.1 - 0.2.2-alpha.1（生产曾实跑 0.2.1-rc.2） | `#v0.3.3` | 实测通过（生产，0.2.1-alpha.1 与 0.2.1-rc.2）；更老的插件 tag 在该宿主上每轮必炸（上游移除了内置 `{{cwd}}` 提示词变量） |
 | 0.2.0-rc.2 | `#v0.3.2` 或 `#v0.3.3` | 实测通过（生产）；v0.3.3 在其上只做减法，不要求宿主新功能 |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | 应可用 - 同一批缝，未实测 |
@@ -195,7 +195,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.7
 # 1) 先把 DSH 宿主升到 0.2.0-rc.2 或更新（正常宿主更新）。
 # 2) 重钉插件（profile 目录；Windows：%USERPROFILE%\.dsh\profiles\web）：
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.7'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.8'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
 # 3) 重启 dsh web。已在用 qwen38 的会话无缝继续（同 id、新声明接管）。
@@ -261,7 +261,7 @@ DSH 设置 → **Qwen3.8 本地**：
 
 #### 4. 历史压缩与裁剪（Compaction）
 当会话过长接近上下文上限时，Harness 会将较早的历史压缩成摘要：
-- **压缩触发点（`compactThresholdPct`）**：自动压缩恰在窗口的该百分比处触发（滑杆默认 80）。设置页滑杆（50–90 区间）改完即生效、无需重启，落在下一个会话步骤；滑杆同时双向联动输出上限——拖动即重写该帽到"保证该点可落地的最大值"（墙护=帽的 1/4），于是每一格都是精确的真实触发点（标签旁显示对应的 token 点）。若某点所需的帽会低于 thinking 预算所需的容量，帽停在该底线、红字 checker 点出该点需要的帽值，保存被拦，直到手动调低某档预算。每档 thinking 预算（低/中/超高）与默认预算必须给正文在输出上限内留出至少 8192 token；设置页在预算输入下方实时显示各档正文可写的空间，不满足则拒绝保存（与服务端写入护栏同源）。压缩调用不受此挤占：其帽按窗口逐次推导。当前用量看聊天页顶部的上下文计量。
+- **压缩触发点（`compactThresholdPct`）**：自动压缩恰在窗口的该百分比处触发（滑杆默认 80）。设置页滑杆（50–90 区间）改完即生效、无需重启，落在下一个会话步骤；滑杆同时双向联动输出上限——拖动即重写该帽到"保证该点可落地的最大值"（墙护=帽的 1/4），于是每一格都是精确的真实触发点（标签旁显示对应的 token 点）。若某点所需的帽会低于 thinking 预算所需的容量，帽停在该底线、红字 checker 点出该点需要的帽值，保存被拦，直到手动调低某档预算。每档 thinking 预算（低/中/超高）与默认预算必须给正文在输出上限内留出至少 8192 token；设置页在预算输入下方实时显示各档正文可写的空间，不满足则拒绝保存并点名违规的线、字段和数字（与服务端写入护栏同源、同作用域）。守卫只评活数字：顶层与当前活动线；别的线存着坏组合不会拦你在这一页的保存，它会在选项行挂红点，直到在那一页被修正；保存只发顶层+活动线的稀疏补丁，其余线原样保留。压缩调用不受此挤占：其帽按窗口逐次推导。当前用量看聊天页顶部的上下文计量。
 - **图片处理（`summarize.images`）**：
   - `strip`（推荐）：在旧轮次中移除大图并替换为简短占位文本，大幅节省上下文空间。
   - `keep`：在历史中保留原图。

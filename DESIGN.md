@@ -173,7 +173,7 @@ dsh-qwen38-local-qol/                      （raw ESM + JSDoc，src 全 .js，�
     client.js         # 设置 tab 组件（四线记忆 + 按线 apiKey 掩码/眼睛 + 裁剪旋钮 + 压缩触发滑杆/帽联动）
     client-entry.js / client.css  # client 半区入口 + 样式
   lib/client.js       # esbuild 产物（CJS + load() 包装，web loader 按字节执行；改 src/client.js 后 scripts/build-client.mjs 重建并提交）
-  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（156 用例）
+  test/               # node --test：wire/stream/prepare/settings-section/client-built/plugin/setup（158 用例）
   docs/               # 六图（server/tab/preset × en/cn）
   README.md           # 中英双语：安装/四线/wire 说明/验证
   DESIGN.md           # 本稿
@@ -256,7 +256,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   preset + `default: qwen38` 注册行都随 patch insert，升级同 id 自动接管；GUI 选 qwen38 preset。
 - **设置 tab（M6）已发布**：四线各自独立记忆（连接/窗口/预算/裁剪旋钮/**各自
   apiKey**（掩码输入 + 显隐眼睛））；summarize 图片处理默认 strip（旋钮默认关 = 裁图）、按线存
-  值；热加载免重启；zh/en 双语。suite = 156 用例全绿。
+  值；热加载免重启；zh/en 双语。suite = 158 用例全绿。
 - **视觉容量守卫**：adapter 实现 `imageRequestPricing`（ninfer (W/32)×(H/32)+2、
   llamacpp 钉 1536；ImageBlock 尺寸在 `attachment` 上、offloaded→0、缺维 ??1024，
   NaN 修复 7d67f1a，alpha.3 token meter 无守卫调用下压死静默压缩的毒源）。
@@ -281,6 +281,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
 - **v0.3.5（状态行检测修复，2026-10-31）**：设置 tab 的"生效默认预设"原先从 `settings.describe()` 全清单里翻 `agent-preset-registry` 行（`selectedDefault ?? default`），该 ns 缺席时兜底链落到插件自家 Config 的 `compaction.defaultPreset`（出厂值恰为 'standard'），把"没读到"冒充成"默认是 standard"，误报 qwen38 未生效（外部实测：Agent 预设页徽标明明挂着 qwen38，设置行亮黄警告；qwen38 实际正常）。修复 = 改读 `ctx.remote.agentPresets.list()` 的 `isDefault` 行（与预设页徽标、新会话解析同一公式 `selectedDefault ?? default`，宿主 `agent-preset-registry` `defaultId` getter 同源）；roster 不可读或无 default 行 = unknown 态：状态行中性文案（"以 Agent 预设页徽标为准"）、圆点灰，本地配置值不再冒充生效默认。+3 用例。教训：状态检测必须读与行为同源的权威面，读取兜底严禁填一个可能语义相反的值。
 - **v0.3.6（状态行 remote 服务读取姿势修正，2026-11-04）**：v0.3.5 的 `ctx.remote.agentPresets.list()` 在两台真实宿主（0.2.2-alpha.2 与 alpha.3）上都拿不到服务，状态行恒 unknown。根因 = Cordis scoped ctx：插件 `inject` 未声明的服务从其 ctx 上被剥掉（`ctx.remote.agentPresets` undefined，TypeError 被空 catch 吞成 unknown 态）；官方预设页是静态半区、ctx 在 root，同一个 `list()` 它能用。修法 = 可选服务改走严格 `ctx.get('remote.agentPresets')`（bypass scoped proxy 直读全局服务表、缺席返回 undefined；宿主 packages/AGENTS.md 同款配方），不加进 `inject`（声明一个未注册服务 = fiber 永久 PENDING、插件整体不装载）。+1 用例（get 命中 → roster 解析；get 缺席 → unknown）。教训两条：第三方 client 插件读任何非声明服务一律 `ctx.get`；空 catch 会把 proxy 剥离伪装成业务态，catch 至少注释点名吞的是什么。
 - **v0.3.7（自适应摘要帽 + 正文空间护栏，2026-11-06）**：触发事故 = 外部 90000 窗口/15000 输出帽/75% 触发的线恒失败「summarization truncated at the token cap」：trim 后 prefill 40~55K，该模型 checkpoint ≈0.6×输入 → 需 24~33K > 行 maxTokens 24576（summarize 配置钉值），单一帽改大又撞 n_ctx 墙（55K+52K>90K）。实现 = `summarize()` 三层：`estimatePrefillTokens`（prepare.js，字符/3 保守估 + tools JSON + 图片按钉价 1536）估 P；`cap = min(max(floor, ceil(capRatio×P)), window − P − 2048)`，floor = max(行 maxTokens, 线帽)（即 v0.3.6 前 wire 的 max() 抬升，保持为下限）；两头装不下 → 调用前抛带几何数字的错误（不再白跑 20 分钟 finish=length）；无几何 → 钉值原样。`capRatio` 新旋钮（默认 0.75，env `DSH_QWEN38_SUMMARIZE_CAP_RATIO`，schema 顶/线两级，0.1~2 校验，不进表单）。护栏升级：`budget + 8192 ≤ cap`（TEXT_RESERVE_TOKENS，服务端 validateSection 与 client 保存门、滑杆 room 三处同源），各档正文空间（cap−budget）在预算输入下方只读展示；滑杆联动 cap 的 red 底线同幅上调（80% 生产几何恰过线：41943 ≥ 40960）。被否方案（backlog 带建造条件）：B 件 effort 联动声明帽（核算 = 触发式 reserved = 请求自身声明的线帽而非 summarize 钉值，两台真实线均 ratio-bound，收益为 0；业界 Anthropic/OpenAI/Codex/官方 DSH 全部静态最坏帽 + thinking 独立预算，Anthropic 对 budget≥max 直接 API 报错 = 本护栏姿势）；分块 map-reduce 压缩（建造条件 = 真实配置降触发点后仍撞 early-exit）。+10 用例（估测器、capRatio 解析、cap 推导三例、early-refuse、无几何原样、capRatio 边界校验、capSync 新底线）。教训：reservedCompletionTokens 读的是 header 请求自身的 maxTokens，凭印象套数字做容量核算必须先回读公式（本轮曾把 24576 误当 reserved 得出相反结论）。
+- **v0.3.8（保存与守卫按活动线切分，2026-11-08）**：触发事故 = v0.3.7 的新护栏拦住自家存量：NInfer 线存量 16384/20971 违规（16384+8192>20971）→ 四个 tab 的任何保存全被拒，用户把 NInfer 页数字修到合规也存不下。三层 bug 定位：① 保存门全节连坐（任何线违规拦所有保存）；② 拒绝文案不点名（服务端文案点名，客户端没抄）；③ 最隐蔽：门评的是 `draft.lines` 加载时的存盘副本（编辑只进顶层字段、切线只搬运，副本永不更新），修好当前线自身也被它的旧副本自阻塞。前置事实核查 = 宿主 settings `update = mergeLayers(当前值, patch)` 深合并 + revision 乐观锁（packages/settings/settings/src/index.ts；官方预设页只发单叶子），稀疏补丁保存有宿主级支持。实现五件：保存门改评 **next-state**（`findBudgetCapViolation(cap, budgetPairsOf(draft))` 评将要写入的顶层数字，即活动线镜像）；服务端联检按 `value.dialect` 限定顶层+活动线（非活动线保留全部结构校验，坏值允许存在 = 严格校验推迟到激活，激活即被同一规则拦回）；dialect 选择行给违规线挂红点（`findLineViolations`：活动线按 live 数字、parked 线按存盘记录，悬停点名）；保存只发顶层+活动线的稀疏补丁；拒绝文案点名线/字段/数字（`budgetCapLine`），guard 类报错（含滑杆 squeeze、数字/百分比校验）随任意编辑与切线清除（`guardError` 与 remote/conflict 类错误分流）。语义变化（有意）：非活动线坏值从"整节拒绝落盘"改为"允许存在 + 红点标记"，配置文件可暂含坏线 = per-tab 独立性的代价。+2 用例（守卫纯函数：点名/边界相等通过/检查顺序/坏输入跳过；`findLineViolations`：活动线按 live、parked 按存盘、切线搬移判定）。教训：保存门必须评"将要写入的 next-state"，评"加载时的副本"必然随编辑漂移出假阳性；以及发布前自己先用真实存量数据过一遍新护栏（NInfer 的 16384/20971 从 v0.3.7 起就是自家 bundle 之外的第一具尸体）。
 - **preset 全声明化**：`presets/qwen38.patch.yml`（bundle patch list 第二件）声明完整 roster、
   卡片文案（rc.2 单串双语 "A / B"）、registry default。setup.js/`~/.dsh/.agent-presets` 生成链退役
   （v0.2.0 用户升级后旧目录惰性无害，可删）。
@@ -307,7 +308,7 @@ summarize{images,keepTurns,toolChars}）。优先级：tab（user 层）> 行/en
   262K 线 xhigh 32768（room 34,816）：pct ≤83 全绿；84 起红（neededCap 33,554），park 34,816 → 有效触发 218,624（83.4%）。
   校验 fail-closed：`validateSection` 在写入即拒（顶层 + 每线：每个 thinkingBudgets 档与 defaultThinkingBudget 必须严格 <
   该线 maxTokens；每线 `compactThresholdPct` 若存在必须整数 50..99；trim 两旋钮 keepTurns/toolChars 为**非负**整数，0 = 关
-  是该字段的文档化模式），client 保存路径同规则报错（budgetCap 文案；数字门与之对齐：几何与预算要求正、trim 旋钮允许 0，
+  是该字段的文档化模式），client 保存路径同规则报错（budgetCapLine 点名文案；v0.3.8 起联检作用域 = 顶层+活动线；数字门与之对齐：几何与预算要求正、trim 旋钮允许 0，
   issue #4 的 tab 单边锁死已修）。既有生产 patch 全部通过（最紧 ninfer default 57344 < 65536），升级不破。
    `defaultThinkingBudget` = 服务端 thinking 上限的**申报值**（不发 wire；room 与校验读它）。仅 ninfer 线在设置页渲染该格
    （ninfer 无视逐请求预算，真实值只在启动参数里，申报是唯一真相渠道）；其他线三档表全覆盖，字段不渲染、保留存储兼容。

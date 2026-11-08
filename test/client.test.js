@@ -462,3 +462,49 @@ test('compactionCapSync slides the output cap with the slider, both directions',
   assert.equal(client.compactionCapSync(262144, 100, 32768), null)
   assert.equal(client.compactionCapSync(0, 80, 32768), null)
 })
+
+test('findBudgetCapViolation: names the first budget crowding the answer under the 8192 reserve', () => {
+  const pairs = (v) => [
+    { term: 'low', text: v.low },
+    { term: 'medium', text: v.medium },
+    { term: 'xhigh', text: v.xhigh },
+    { term: 'defaultThinkingBudget', text: v.defaultBudget },
+  ]
+  // The production geometry passes by 983; the equality edge passes.
+  assert.equal(client.findBudgetCapViolation('41943', pairs({ low: '8192', medium: '16384', xhigh: '32768', defaultBudget: '32768' })), null)
+  assert.equal(client.findBudgetCapViolation('24576', pairs({ low: '4096', medium: '8192', xhigh: '16384', defaultBudget: '16384' })), null)
+  // The NInfer incident shape: the violation carries the field and numbers
+  // for the named refusal (16384 under 20971 leaves a 4587 answer).
+  assert.deepEqual(client.findBudgetCapViolation('20971', pairs({ low: '4096', medium: '8192', xhigh: '16384', defaultBudget: '16384' })),
+    { term: 'xhigh', budget: 16384, cap: 20971, room: 4587 })
+  // Check order: the first offending budget wins; the default is last.
+  assert.equal(client.findBudgetCapViolation('10000', pairs({ low: '9999', medium: '16384', xhigh: '16384', defaultBudget: '20000' })).term, 'low')
+  // Empty inputs are the number guard's business, skipped here; a broken cap
+  // cannot be judged.
+  assert.equal(client.findBudgetCapViolation('10000', pairs({ low: '', medium: '', xhigh: '', defaultBudget: '' })), null)
+  assert.equal(client.findBudgetCapViolation('', pairs({ xhigh: '16384' })), null)
+})
+
+test('findLineViolations: the active line is judged by the live inputs, parked lines by their records', () => {
+  const draft = (over = {}) => ({
+    dialect: 'llamacpp',
+    maxTokens: '41943', low: '8192', medium: '16384', xhigh: '32768', defaultBudget: '32768',
+    lines: {
+      // The active line's stale parked copy (a save-blocking false positive
+      // before v0.3.8): judging it is the live inputs' job.
+      llamacpp: { maxTokens: '20971', low: '4096', medium: '8192', xhigh: '16384', defaultThinkingBudget: '16384' },
+      ninfer: { maxTokens: '20971', low: '4096', medium: '8192', xhigh: '16384', defaultThinkingBudget: '16384' },
+      tabbyapi: { maxTokens: '65536', low: '8192', medium: '16384', xhigh: '32768', defaultThinkingBudget: '32768' },
+      omlx: { maxTokens: '52428', low: '4096', medium: '8192', xhigh: '16384', defaultThinkingBudget: '16384' },
+    },
+    ...over,
+  })
+  // Active line clean, one parked line dirty: only that remote line flags.
+  assert.deepEqual(Object.keys(client.findLineViolations(draft())), ['ninfer'])
+  // Dirty live inputs flag the active line too (insertion order: llamacpp first).
+  assert.deepEqual(Object.keys(client.findLineViolations(draft({ xhigh: '34816' }))), ['llamacpp', 'ninfer'])
+  // Switching lines moves the judgment: the lifted NInfer record now rides the
+  // live inputs and flags as the active line (and llamacpp, parked, still does).
+  const switched = draft({ dialect: 'ninfer', maxTokens: '20971', low: '4096', medium: '8192', xhigh: '16384', defaultBudget: '16384' })
+  assert.deepEqual(Object.keys(client.findLineViolations(switched)), ['llamacpp', 'ninfer'])
+})

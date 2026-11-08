@@ -232,6 +232,12 @@ export function validateSection(value) {
   // Preset-style cross check: thinking and answers share the line's output
   // cap, so every effort budget (and the default) must keep the answer's room
   // under it: `budget + TEXT_RESERVE_TOKENS <= cap`, refused at the write.
+  // The strict joint check rides ONLY the live numbers: the top level (what
+  // the adapter and the compaction backend read for the active line) and the
+  // active line's own record. A parked remote line's stale combination is
+  // allowed to persist (it becomes live numbers the moment it is selected,
+  // where the same check catches it); the tab shows it as a red dot instead.
+  const activeDialect = value.dialect === undefined ? 'llamacpp' : value.dialect
   const checkBudgetsFitCap = (cap, budgetMap, defaultBudget, where) => {
     if (!Number.isInteger(cap) || cap <= 0) return
     for (const [effort, budgetTokens] of Object.entries(budgetMap)) {
@@ -245,7 +251,8 @@ export function validateSection(value) {
   }
   checkBudgetsFitCap(value.maxTokens, budgets, value.defaultThinkingBudget, '')
   // The per-line memory carries the same window numbers; validate each line
-  // so a hand-edited document cannot park a bad number that later goes live.
+  // so a hand-edited document cannot park a malformed number, and the answer-
+  // room cross check on top for the active line only.
   for (const [lineName, line] of Object.entries(value.lines ?? {})) {
     if (line === undefined || line === null || typeof line !== 'object') continue
     for (const knob of ['contextWindow', 'maxTokens']) {
@@ -268,7 +275,9 @@ export function validateSection(value) {
         || line.compactThresholdPct < 50 || line.compactThresholdPct > 99)) {
       throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.compactThresholdPct must be an integer 50..99, got ${String(line.compactThresholdPct)}`)
     }
-    checkBudgetsFitCap(line.maxTokens, line.thinkingBudgets ?? {}, lineDefaultBudget, `lines.${lineName}.`)
+    if (lineName === activeDialect) {
+      checkBudgetsFitCap(line.maxTokens, line.thinkingBudgets ?? {}, lineDefaultBudget, `lines.${lineName}.`)
+    }
     const lineImages = line.summarize?.images
     if (lineImages !== undefined && lineImages !== 'strip' && lineImages !== 'keep') {
       throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.images must be "strip" or "keep", got "${lineImages}"`)

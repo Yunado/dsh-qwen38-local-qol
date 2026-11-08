@@ -45,11 +45,16 @@ test('validateSection: every thinking budget must keep the answer a room of 8192
   validateSection({ maxTokens: 20480, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 12288 }, defaultThinkingBudget: 8192 })
   // The production shape (32768 xhigh under a 41943 cap) passes by 983.
   validateSection({ maxTokens: 41943, thinkingBudgets: { low: 8192, medium: 16384, xhigh: 32768 }, defaultThinkingBudget: 32768 })
-  // Per line: the same check rides each parked line's own cap.
-  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 40960, thinkingBudgets: { xhigh: 36864 } } } }), /lines\.ninfer\.thinkingBudgets/)
-  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 57344, defaultThinkingBudget: 57344 } } }), /lines\.ninfer\.defaultThinkingBudget/)
-  // The production ninfer shape (hardcoded 57344 default under a 65536 cap) passes on the edge.
-  validateSection({ lines: { ninfer: { maxTokens: 65536, thinkingBudgets: { low: 8192, medium: 32768, xhigh: 32768 }, defaultThinkingBudget: 57344 } } })
+  // Per line: the joint check rides the ACTIVE line only (v0.3.8 per-tab
+  // semantics: a parked remote line may hold a stale combination - the tab
+  // flags it, the write does not block on it). The active line's own record
+  // is judged like the top level; `dialect` decides which line is active
+  // (default llamacpp).
+  validateSection({ lines: { ninfer: { maxTokens: 40960, thinkingBudgets: { xhigh: 36864 } } } })
+  assert.throws(() => validateSection({ lines: { llamacpp: { maxTokens: 40960, thinkingBudgets: { xhigh: 36864 } } } }), /lines\.llamacpp\.thinkingBudgets/)
+  assert.throws(() => validateSection({ dialect: 'ninfer', lines: { ninfer: { maxTokens: 57344, defaultThinkingBudget: 57344 } } }), /lines\.ninfer\.defaultThinkingBudget/)
+  // The production ninfer shape (hardcoded 57344 default under a 65536 cap) passes on the edge as the active line.
+  validateSection({ dialect: 'ninfer', lines: { ninfer: { maxTokens: 65536, thinkingBudgets: { low: 8192, medium: 32768, xhigh: 32768 }, defaultThinkingBudget: 57344 } } })
 })
 
 test('validateSection: summarize.capRatio is bounded to 0.1..2 on the top level and per line', () => {
