@@ -47,6 +47,16 @@ import { DEFAULT_TRIM_KNOBS } from './prepare.js'
 export const NS = 'qwen38-local-qol'
 
 /**
+ * The answer's room the output-cap guard always keeps free: a thinking
+ * budget may not crowd the visible response under this many tokens of the
+ * cap (thinking and answers share it; the industry practice is to refuse the
+ * configuration at the write, like the Anthropic API refuses
+ * `budget_tokens >= max_tokens`). Mirrored by the settings tab's save gate
+ * and slider room.
+ */
+export const TEXT_RESERVE_TOKENS = 8192
+
+/**
  * The plugin row's live config reference, published by the entry fiber.
  *
  * Why a module mirror: the compaction backend is mounted in a preset fiber,
@@ -111,6 +121,7 @@ function lineSchema(baseURL, model, contextWindow, maxTokens, budgets, mark) {
       images: mark(Schema.string()).default(DEFAULT_TRIM_KNOBS.images),
       keepTurns: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.keepTurns),
       toolChars: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.toolChars),
+      capRatio: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.capRatio),
     }),
     // This line's own compaction trigger percent. Deliberately WITHOUT a
     // schema default: absent means "follow the top-level value", so a profile
@@ -157,6 +168,7 @@ function buildSchema(mark) {
       images: mark(Schema.string()).default(DEFAULT_TRIM_KNOBS.images),
       keepTurns: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.keepTurns),
       toolChars: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.toolChars),
+      capRatio: mark(Schema.number()).default(DEFAULT_TRIM_KNOBS.capRatio),
     }),
     // Where automatic pressure compaction fires on THIS line, as a percent of
     // its context window: the settings tab writes it per line, and the active
@@ -218,16 +230,17 @@ export function validateSection(value) {
     throw new Error(`dsh-qwen38-local-qol: defaultThinkingBudget must be a positive integer, got ${String(value.defaultThinkingBudget)}`)
   }
   // Preset-style cross check: thinking and answers share the line's output
-  // cap, so every effort budget (and the default) must stay strictly below it.
+  // cap, so every effort budget (and the default) must keep the answer's room
+  // under it: `budget + TEXT_RESERVE_TOKENS <= cap`, refused at the write.
   const checkBudgetsFitCap = (cap, budgetMap, defaultBudget, where) => {
     if (!Number.isInteger(cap) || cap <= 0) return
     for (const [effort, budgetTokens] of Object.entries(budgetMap)) {
-      if (Number.isInteger(budgetTokens) && budgetTokens >= cap) {
-        throw new Error(`dsh-qwen38-local-qol: ${where}thinkingBudgets["${effort}"] (${String(budgetTokens)}) must stay below the output cap ${String(cap)} (thinking and answers share the cap)`)
+      if (Number.isInteger(budgetTokens) && budgetTokens + TEXT_RESERVE_TOKENS > cap) {
+        throw new Error(`dsh-qwen38-local-qol: ${where}thinkingBudgets["${effort}"] (${String(budgetTokens)}) leaves under ${TEXT_RESERVE_TOKENS} tokens of the output cap ${String(cap)} for the answer (thinking and answers share the cap): raise the cap or lower the budget`)
       }
     }
-    if (Number.isInteger(defaultBudget) && defaultBudget >= cap) {
-      throw new Error(`dsh-qwen38-local-qol: ${where}defaultThinkingBudget (${String(defaultBudget)}) must stay below the output cap ${String(cap)}`)
+    if (Number.isInteger(defaultBudget) && defaultBudget + TEXT_RESERVE_TOKENS > cap) {
+      throw new Error(`dsh-qwen38-local-qol: ${where}defaultThinkingBudget (${String(defaultBudget)}) leaves under ${TEXT_RESERVE_TOKENS} tokens of the output cap ${String(cap)} for the answer: raise the cap or lower the budget`)
     }
   }
   checkBudgetsFitCap(value.maxTokens, budgets, value.defaultThinkingBudget, '')
@@ -266,6 +279,10 @@ export function validateSection(value) {
         throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.${knob} must be a non-negative integer, got ${String(raw)}`)
       }
     }
+    const lineCapRatio = line.summarize?.capRatio
+    if (lineCapRatio !== undefined && (!Number.isFinite(lineCapRatio) || lineCapRatio < 0.1 || lineCapRatio > 2)) {
+      throw new Error(`dsh-qwen38-local-qol: lines.${lineName}.summarize.capRatio must be a number in 0.1..2, got ${String(lineCapRatio)}`)
+    }
   }
   if (value.defaultEffort !== undefined && value.defaultEffort !== 'off' && budgets[value.defaultEffort] === undefined) {
     throw new Error(`dsh-qwen38-local-qol: defaultEffort "${value.defaultEffort}" is not a declared effort ("off" + thinkingBudgets keys)`)
@@ -280,6 +297,10 @@ export function validateSection(value) {
       if (raw !== undefined && (!Number.isInteger(raw) || raw < 0)) {
         throw new Error(`dsh-qwen38-local-qol: summarize.${knob} must be a non-negative integer, got ${String(raw)}`)
       }
+    }
+    const capRatio = value.summarize?.capRatio
+    if (capRatio !== undefined && (!Number.isFinite(capRatio) || capRatio < 0.1 || capRatio > 2)) {
+      throw new Error(`dsh-qwen38-local-qol: summarize.capRatio must be a number in 0.1..2, got ${String(capRatio)}`)
     }
   }
   // The status fields ride the legacy section base only; a 0.2.0 Config has

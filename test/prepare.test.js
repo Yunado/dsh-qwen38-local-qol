@@ -102,7 +102,7 @@ test('resolveTrimKnobs: defaults and env parsing', () => {
   assert.deepEqual(resolveTrimKnobs({}), DEFAULT_TRIM_KNOBS)
   assert.deepEqual(
     resolveTrimKnobs({ DSH_QWEN38_SUMMARIZE_IMAGES: 'keep', DSH_QWEN38_SUMMARIZE_KEEP_TURNS: '2', DSH_QWEN38_SUMMARIZE_TOOL_CHARS: '100' }),
-    { images: 'keep', keepTurns: 2, toolChars: 100 },
+    { images: 'keep', keepTurns: 2, toolChars: 100, capRatio: 0.75 },
   )
   assert.deepEqual(
     resolveTrimKnobs({ DSH_QWEN38_SUMMARIZE_IMAGES: 'bogus', DSH_QWEN38_SUMMARIZE_KEEP_TURNS: 'x', DSH_QWEN38_SUMMARIZE_TOOL_CHARS: '-3' }),

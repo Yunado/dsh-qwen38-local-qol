@@ -17,14 +17,17 @@
  *   idle out under the stream watchdog; thinking stays off for the call
  *   because the wire forces it off for `purpose: 'compaction'` requests, so
  *   the whole output cap is available for the checkpoint instead of burning
- *   it on thinking.
+ *   it on thinking. The call's output cap is then derived per request from
+ *   the trimmed prefill and the active line's window (see
+ *   {@link QwenLocalCompaction.summarize}) instead of trusting one pinned
+ *   number across window sizes, and a geometrically hopeless prefill is
+ *   refused before the call.
  *
  * Mounted as a service row in the `qwen38` preset roster declared by this
  * bundle (`presets/qwen38.patch.yml`), inside the preset's isolated compaction
- * group. The row config is the stock `BasicCompactionConfig`; the only
- * recommended row value is `maxTokens: 52428` (the stock 8192 default
- * truncates long local checkpoints); the wire also raises any compaction
- * call to the line's output cap, which covers presets without this row. The
+ * group. The row config is the stock `BasicCompactionConfig`; its `maxTokens`
+ * is a FLOOR under the adaptive cap (the row ships 24576 as the no-geometry
+ * fallback), never a ceiling for a line that affords more. The
  * trigger and trim knobs come from the plugin row's live config (the Settings
  * tab's `compactThresholdPct` and `summarize` block, via the module mirror
  * {@link liveConfigView}) while that row is mounted, else the legacy settings
@@ -35,7 +38,7 @@
  */
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import { plainConfig } from './config.js'
-import { prepareSummaryRegion, resolveTrimKnobs, DEFAULT_TRIM_KNOBS } from './prepare.js'
+import { prepareSummaryRegion, resolveTrimKnobs, DEFAULT_TRIM_KNOBS, estimatePrefillTokens } from './prepare.js'
 import { NS, liveConfigView } from './settings-section.js'
 
 /** Inclusive bounds for the live trigger percent (mirrors `validateSection`). */
@@ -57,6 +60,13 @@ const WALL_GUARD_MIN_TOKENS = 1024
 
 /** Fallback guard when the section carries no usable geometry. */
 const WALL_GUARD_FALLBACK_TOKENS = 10000
+
+/**
+ * Room the derived summary cap always keeps free below the window: the chat
+ * template's framing and the estimator's own tolerance. A safety invariant,
+ * not a deployment knob.
+ */
+const SUMMARY_MARGIN_TOKENS = 2048
 
 /** Unwrap one value a volatile leaf may deliver wrapped. */
 function plainValue(value) {
@@ -160,25 +170,50 @@ export class QwenLocalCompaction extends BasicCompactionEngine {
   }
 
   /**
-   * Trim the replayed region, then delegate to the stock summarization path
-   * (target resolution, the `reasoningEffort: off` one-shot
+   * Trim the replayed region, derive this call's output cap from the trimmed
+   * prefill and the active line's window, then delegate to the stock
+   * summarization path (target resolution, the `reasoningEffort: off` one-shot
    * `ctx.llm.stream()` call, and the checkpoint envelope) so every pricing
    * and replay decision stays the engine's.
+   *
+   * The derived cap: `min(window - prefill - margin, max(floor, capRatio x
+   * prefill))`, where the floor is the larger of the row's `maxTokens` and the
+   * line's configured output cap (what the wire would send today) and the
+   * first term is the room left below the line's context window. A prefill a
+   * verbose model could not summarize within that room is refused before the
+   * call, with the geometry numbers named, instead of burning a slow local run
+   * into `finish_reason: length`. Without a resolvable line geometry the
+   * stock pinned cap stands unchanged.
    * @param input - replayed conversation prefix (system, tools, and leading messages) to condense.
    * @param agent - supplies routed-model history, fallback model, and session id.
    * @param signal - optional cancellation forwarded to the adapter.
    * @returns safe text summary blocks and the exact auxiliary call envelope and output.
    */
   async summarize(input, agent, signal) {
-    // Trim knobs, live: the user-settings section's resolved `summarize`
-    // block when its namespace is registered (the schema resolves it
-    // complete, with defaults for untouched fields), else the environment
-    // layer.
-    const sectionKnobs = settingsSection(this.ctx)?.summarize
+    // Trim knobs and line geometry, live: the user-settings section's
+    // resolved `summarize` block when its namespace is registered (the schema
+    // resolves it complete, with defaults for untouched fields), else the
+    // environment layer.
+    const section = settingsSection(this.ctx)
+    const sectionKnobs = section?.summarize
     const knobs = sectionKnobs !== undefined && typeof sectionKnobs === 'object'
       ? { ...DEFAULT_TRIM_KNOBS, ...sectionKnobs }
       : resolveTrimKnobs(process.env)
     const prepared = prepareSummaryRegion(input.messages, knobs)
+    const geometry = wallGeometry(section)
+    if (geometry !== undefined) {
+      const base = this.baseConfig ?? this.config
+      const prefill = estimatePrefillTokens(prepared, input.tools)
+      const floor = Math.max(base.maxTokens ?? 0, geometry.outputTokens)
+      const upper = geometry.windowTokens - prefill - SUMMARY_MARGIN_TOKENS
+      if (upper < floor) {
+        throw new Error(`dsh-qwen38-local-qol: compaction refused before the call: the trimmed summarizer prefill (~${prefill} tokens) leaves ${Math.max(upper, 0)} tokens of the ${geometry.windowTokens}-token line for a checkpoint that needs at least ${floor}. Lower the trigger percent, keep fewer turns or fewer tool characters, or raise the line's context window.`)
+      }
+      const ratio = Number(knobs.capRatio)
+      const safeRatio = Number.isFinite(ratio) && ratio > 0 ? Math.min(Math.max(ratio, 0.1), 2) : DEFAULT_TRIM_KNOBS.capRatio
+      const desired = Math.max(floor, Math.ceil(safeRatio * prefill))
+      this.config = { ...base, maxTokens: Math.min(desired, upper) }
+    }
     return super.summarize({ ...input, messages: prepared }, agent, signal)
   }
 }

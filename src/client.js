@@ -83,7 +83,8 @@ const COPY = {
     compactTrigger: 'Compaction trigger',
     compactTriggerHint: 'Automatic compaction fires at this percentage of the window. The slider also syncs the output cap to keep the point exact (the guard stays a quarter of that cap). At the current cap the guard is {guard} tokens.',
     invalidPct: 'Trigger percent must be a whole number 50..99.',
-    budgetCap: 'Every thinking budget (low/medium/xhigh and the default) must stay below the output cap: thinking and answers share it.',
+    budgetCap: 'Every thinking budget must keep 8192 tokens of the output cap free for the answer (thinking and answers share the cap): raise the cap or lower the budget.',
+    textRoom: 'Room the visible answer keeps inside the output cap, per effort: {ledger}.',
     squeezeBlocked: 'This point needs the output cap at or below {cap}, which cuts into the thinking budgets. Lower a thinking budget, or move the slider down, before saving.',
     remoteError: 'Settings request failed: ',
     compactionNotSet: 'The qwen38 preset is not declared by the installed plugin bundle (reinstall or update the plugin, then restart dsh web).',
@@ -133,7 +134,8 @@ const COPY = {
     compactTrigger: '压缩触发点',
     compactTriggerHint: '自动压缩在窗口的该百分比处触发；滑杆同时联动输出上限以保证该点精确落地（墙护始终为该上限的 1/4）。当前上限对应的墙护为 {guard} token。',
     invalidPct: '触发比例必须是 50 到 99 的整数。',
-    budgetCap: '每档 thinking 预算（低/中/超高）及默认预算必须小于输出上限：思考与回答共用同一个帽。',
+    budgetCap: '每档 thinking 预算必须给正文在输出上限内留出至少 8192 token（思考与回答共用同一个帽）：请提高上限或下调预算。',
+    textRoom: '输出上限内、扣除该档思考预算后正文可写的空间：{ledger}。',
     squeezeBlocked: '该触发点需要把输出上限降到 {cap} 以下，这会挤占 thinking 预算。请先调低某档 thinking 预算，或把滑杆调低，再保存。',
     remoteError: '设置请求失败：',
     compactionNotSet: 'qwen38 预设未由已安装的插件 bundle 声明（重装或更新插件后重启 dsh web）。',
@@ -206,6 +208,18 @@ const LINE_WINDOW_DEFAULTS = Object.freeze({
 })
 
 /**
+ * The answer's room the output-cap guard keeps free, mirroring the
+ * server-side `TEXT_RESERVE_TOKENS` (the client bundle cannot import the
+ * server module): a thinking budget may not crowd the visible answer under
+ * this many tokens of the cap. The save gate and the slider's room both use
+ * it, so the tab never parks a cap the server would refuse.
+ */
+const TEXT_RESERVE_TOKENS = 8192
+
+/** Format a token count compactly for the per-effort answer-room ledger. */
+const formatTokenK = (tokens) => `${(tokens / 1000).toFixed(1)}K`
+
+/**
  * The active line's wall guard, mirroring the backend's `wallGuardTokens`:
  * the linear safety wiggle above the cap - a quarter of the output cap,
  * clamped to a quarter of the remaining budget on narrow lines, floored at
@@ -231,10 +245,11 @@ export function compactionWallGuardTokens(windowTokens, outputTokens) {
  * the largest cap whose guard still leaves `pct% x window` reachable,
  * `cap + guard(cap) <= window x (100 - pct) / 100` with guard = cap/4, i.e.
  * `cap = floor(window x (100 - pct) / 125)`. When that cap would cut under
- * the thinking budgets' room (max budget + 2048, since thinking and answers
- * share the cap), the point cannot land: report `red` and park the cap at the
- * room - the tab shows a red checker naming the cap the point needs, and the
- * save is refused until a thinking budget drops or the slider moves back.
+ * the thinking budgets' room (max budget + the answer's reserved room, since
+ * thinking and answers share the cap), the point cannot land: report `red`
+ * and park the cap at the room - the tab shows a red checker naming the cap
+ * the point needs, and the save is refused until a thinking budget drops or
+ * the slider moves back.
  * @param windowTokens - the active line's context window.
  * @param pct - the slider percent being requested.
  * @param maxThinkingBudget - the largest configured thinking budget (0/invalid parks the room at 1024).
@@ -247,7 +262,7 @@ export function compactionCapSync(windowTokens, pct, maxThinkingBudget) {
   }
   const neededCap = Math.max(1024, Math.floor((windowTokens * (100 - pct)) / 125))
   if (windowTokens - neededCap < 2) return null
-  const room = Number.isInteger(maxThinkingBudget) && maxThinkingBudget > 0 ? maxThinkingBudget + 2048 : 1024
+  const room = Number.isInteger(maxThinkingBudget) && maxThinkingBudget > 0 ? maxThinkingBudget + TEXT_RESERVE_TOKENS : 1024
   const red = neededCap < room
   return { cap: red ? Math.min(room, windowTokens - 1) : neededCap, neededCap, red }
 }
@@ -430,9 +445,10 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
       setState((s) => ({ ...s, error: t.invalidPct }))
       return
     }
-    // Preset-style cross check: every effort's thinking budget (and the
-    // default) shares the line's output cap, so each must stay below it.
-    const budgetsFit = (capText, budgetTexts) => budgetTexts.every((text) => Number.parseInt(text, 10) < Number.parseInt(capText, 10))
+    // Preset-style cross check (mirrors the server's `validateSection`): every
+    // effort's thinking budget (and the default) shares the line's output cap,
+    // so each must keep the answer's room free under it.
+    const budgetsFit = (capText, budgetTexts) => budgetTexts.every((text) => Number.parseInt(text, 10) + TEXT_RESERVE_TOKENS <= Number.parseInt(capText, 10))
     const activeFits = budgetsFit(draft.maxTokens, [draft.low, draft.medium, draft.xhigh, draft.defaultBudget])
     const linesFit = Object.values(draft.lines).every((line) => budgetsFit(line.maxTokens, [line.low, line.medium, line.xhigh, line.defaultThinkingBudget]))
     if (!activeFits || !linesFit) {
@@ -445,7 +461,7 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
     // checker the tab shows also refuses the save.
     const neededCap = Math.max(1024, Math.floor((Number.parseInt(draft.contextWindow, 10) * (100 - compactPct)) / 125))
     const maxBudget = Math.max(0, ...[draft.low, draft.medium, draft.xhigh, draft.defaultBudget].map((text) => Number.parseInt(text, 10)))
-    const room = maxBudget > 0 ? maxBudget + 2048 : 1024
+    const room = maxBudget > 0 ? maxBudget + TEXT_RESERVE_TOKENS : 1024
     if (neededCap < room) {
       setState((s) => ({ ...s, error: t.squeezeBlocked.replace('{cap}', neededCap.toLocaleString('en-US')) }))
       return
@@ -648,6 +664,17 @@ function QwenLocalSectionEntry({ useLocale, load, save }) {
             React.createElement(Input, { className: 'qol-input', inputMode: 'numeric', disabled: ninfer, value: draft[effort], onChange: digitsOnly((v) => { setDraft({ [effort]: v }) }) })),
         ),
       ),
+      // The per-effort answer-room ledger: what the visible answer may still
+      // write inside the output cap once that effort's thinking budget is set
+      // aside - the guard's own arithmetic, shown instead of hidden. A
+      // negative entry names the crowding the save gate refuses.
+      React.createElement('p', { className: 'qol-hint' }, t.textRoom.replace('{ledger}', (() => {
+        const cap = /^\d+$/.test(draft.maxTokens) ? Number.parseInt(draft.maxTokens, 10) : 0
+        if (cap <= 0) return '-'
+        return ['low', 'medium', 'xhigh']
+          .map((effort) => `${effort} ${formatTokenK(cap - (/^\d+$/.test(draft[effort]) ? Number.parseInt(draft[effort], 10) : 0))}`)
+          .join(' / ')
+      })())),
       // The declared server ceiling, NInfer only: that line ignores every
       // per-request budget, so its real thinking number lives in the startup
       // flag and this field is the plugin's only window into it. The output

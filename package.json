@@ -1,6 +1,6 @@
 {
   "name": "dsh-qwen38-local-qol",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "DeepSeek Harness QoL plugin for the local Qwen3.8 line (27B, Flash-Next): per-request thinking budgets on llama.cpp, NInfer, TabbyAPI, and oMLX dialects, vision + tools, and a compaction backend whose summaries stop burning the output cap on thinking.",
   "type": "module",
   "license": "MIT",
@@ -30,7 +30,10 @@
   },
   "dsh": {
     "bundle": {
-      "patch": ["./cordis.patch.yml", "./presets/qwen38.patch.yml"]
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/qwen38.patch.yml"
+      ]
     },
     "client": {
       "platform": "web",
@@ -66,8 +69,8 @@
   },
   "homepage": "https://github.com/Yunado/dsh-qwen38-local-qol#readme",
   "peerDependencies": {
-    "@deepseek-ai/cosmokit": "^1.8.5",
     "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/cosmokit": "^1.8.5",
     "@deepseek-ai/dsh-compaction-basic": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-llm": "^0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4",
@@ -79,8 +82,8 @@
     }
   },
   "devDependencies": {
-    "@deepseek-ai/cosmokit": "^1.8.5",
     "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cosmokit": "^1.8.5",
     "@deepseek-ai/dsh-attachment": "0.2.0-rc.2",
     "@deepseek-ai/dsh-brand": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-primitives": "file:test/primitives-stub",

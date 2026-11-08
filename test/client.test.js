@@ -440,22 +440,23 @@ test('compactionWallGuardTokens mirrors the backend linear guard', () => {
 })
 
 test('compactionCapSync slides the output cap with the slider, both directions', () => {
-  // Production geometry with xhigh 32768 (room 34,816): exact caps while the
-  // point can land...
+  // Production geometry with xhigh 32768 (room 40,960 = budget + the
+  // answer's 8192 reserve): exact caps while the point can land, the
+  // production 80 staying clean by 983 tokens...
   assert.deepEqual(client.compactionCapSync(262144, 50, 32768), { cap: 104857, neededCap: 104857, red: false })
   assert.deepEqual(client.compactionCapSync(262144, 60, 32768), { cap: 83886, neededCap: 83886, red: false })
   assert.deepEqual(client.compactionCapSync(262144, 80, 32768), { cap: 41943, neededCap: 41943, red: false })
-  assert.deepEqual(client.compactionCapSync(262144, 83, 32768), { cap: 35651, neededCap: 35651, red: false })
-  // ...and park at the room, red, when the cap the point needs cuts into the
-  // thinking budgets (84 needs 33,554 < 34,816).
-  assert.deepEqual(client.compactionCapSync(262144, 84, 32768), { cap: 34816, neededCap: 33554, red: true })
-  assert.deepEqual(client.compactionCapSync(262144, 90, 32768), { cap: 34816, neededCap: 20971, red: true })
-  // Smaller budgets open the right end: with xhigh 8192 the room is 10,240,
+  // ...and park at the room, red, as soon as the cap the point needs cuts
+  // into the answer's reserve (83 needs 35,651 < 40,960).
+  assert.deepEqual(client.compactionCapSync(262144, 83, 32768), { cap: 40960, neededCap: 35651, red: true })
+  assert.deepEqual(client.compactionCapSync(262144, 84, 32768), { cap: 40960, neededCap: 33554, red: true })
+  assert.deepEqual(client.compactionCapSync(262144, 90, 32768), { cap: 40960, neededCap: 20971, red: true })
+  // Smaller budgets open the right end: with xhigh 8192 the room is 16,384,
   // so even 90 (needing 20,971) lands clean.
   assert.deepEqual(client.compactionCapSync(262144, 90, 8192), { cap: 20971, neededCap: 20971, red: false })
-  // Small windows get small guards, and can still go red at the edge.
-  assert.deepEqual(client.compactionCapSync(32768, 70, 4096), { cap: 7864, neededCap: 7864, red: false })
-  assert.deepEqual(client.compactionCapSync(32768, 90, 4096), { cap: 6144, neededCap: 2621, red: true })
+  // Small windows: the reserve crowds the point out of tiny geometries.
+  assert.deepEqual(client.compactionCapSync(32768, 70, 4096), { cap: 12288, neededCap: 7864, red: true })
+  assert.deepEqual(client.compactionCapSync(32768, 90, 4096), { cap: 12288, neededCap: 2621, red: true })
   // Out-of-band percent and broken geometry yield null.
   assert.equal(client.compactionCapSync(262144, 40, 32768), null)
   assert.equal(client.compactionCapSync(262144, 100, 32768), null)

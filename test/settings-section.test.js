@@ -32,18 +32,29 @@ test('validateSection: an out-of-range compaction trigger fails loud', () => {
   validateSection({ compactThresholdPct: 99 })
 })
 
-test('validateSection: every thinking budget must stay below the output cap', () => {
-  // Top level: a budget at or over the cap shares the same wire cap as the
-  // answer, so it is refused at the write.
+test('validateSection: every thinking budget must keep the answer a room of 8192 under the cap', () => {
+  // Top level: a budget may not crowd the answer under the reserve; refused
+  // at the write (the Anthropic-style fail-loud on budget_tokens vs max_tokens).
   assert.throws(() => validateSection({ maxTokens: 20480, thinkingBudgets: { xhigh: 32768 } }), /thinkingBudgets\["xhigh"\]/)
-  assert.throws(() => validateSection({ maxTokens: 20480, thinkingBudgets: { xhigh: 20480 } }), /thinkingBudgets\["xhigh"\]/)
-  assert.throws(() => validateSection({ maxTokens: 8192, thinkingBudgets: { low: 4096 }, defaultThinkingBudget: 8192 }), /defaultThinkingBudget/)
-  validateSection({ maxTokens: 20480, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 16384 }, defaultThinkingBudget: 8192 })
+  assert.throws(() => validateSection({ maxTokens: 15000, thinkingBudgets: { xhigh: 12000 } }), /thinkingBudgets\["xhigh"\]/)
+  assert.throws(() => validateSection({ maxTokens: 16384, thinkingBudgets: { low: 4096 }, defaultThinkingBudget: 12289 }), /defaultThinkingBudget/)
+  // A budget at exactly cap minus the reserve passes (the equality edge).
+  validateSection({ maxTokens: 20480, thinkingBudgets: { low: 4096, medium: 8192, xhigh: 12288 }, defaultThinkingBudget: 8192 })
+  // The production shape (32768 xhigh under a 41943 cap) passes by 983.
+  validateSection({ maxTokens: 41943, thinkingBudgets: { low: 8192, medium: 16384, xhigh: 32768 }, defaultThinkingBudget: 32768 })
   // Per line: the same check rides each parked line's own cap.
-  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 40960, thinkingBudgets: { xhigh: 57344 } } } }), /lines\.ninfer\.thinkingBudgets/)
+  assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 40960, thinkingBudgets: { xhigh: 36864 } } } }), /lines\.ninfer\.thinkingBudgets/)
   assert.throws(() => validateSection({ lines: { ninfer: { maxTokens: 57344, defaultThinkingBudget: 57344 } } }), /lines\.ninfer\.defaultThinkingBudget/)
-  // The production ninfer shape (hardcoded 57344 default under a 65536 cap) passes.
+  // The production ninfer shape (hardcoded 57344 default under a 65536 cap) passes on the edge.
   validateSection({ lines: { ninfer: { maxTokens: 65536, thinkingBudgets: { low: 8192, medium: 32768, xhigh: 32768 }, defaultThinkingBudget: 57344 } } })
+})
+
+test('validateSection: summarize.capRatio is bounded to 0.1..2 on the top level and per line', () => {
+  assert.throws(() => validateSection({ summarize: { capRatio: 0.05 } }), /summarize\.capRatio/)
+  assert.throws(() => validateSection({ summarize: { capRatio: 3 } }), /summarize\.capRatio/)
+  assert.throws(() => validateSection({ lines: { llamacpp: { summarize: { capRatio: Number.NaN } } } }), /lines\.llamacpp\.summarize\.capRatio/)
+  validateSection({ summarize: { capRatio: 0.1 } })
+  validateSection({ summarize: { capRatio: 2 } })
 })
 
 test('sectionSchema: a fully-default value opens on the general default (llama.cpp line)', () => {

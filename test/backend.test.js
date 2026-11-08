@@ -189,6 +189,112 @@ test('backend: default export is the class and extends the stock engine', () => 
   assert.ok(QwenLocalCompaction.prototype instanceof BasicCompactionEngine)
 })
 
+/** A settings context serving one line geometry (the legacy seam). */
+function ctxWithGeometry(geometry) {
+  return {
+    get: (name) => name === 'settings'
+      ? { get: (ns) => (ns === NS ? geometry : undefined) }
+      : undefined,
+  }
+}
+
+/** One user message of exactly `tokens` estimated tokens (3 chars each). */
+function prefillOf(tokens) {
+  return [{ role: 'user', content: [{ type: 'text', text: 'x'.repeat(tokens * 3) }] }]
+}
+
+test('backend: summarize derives the call cap from the trimmed prefill and the line window', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.summarize = async function () { seen.push(this.config.maxTokens); return { blocks: [] } }
+    // A narrow line with a verbose-prefill call: 90,000 window, 15,000 line
+    // cap, 50,000-token prefill -> desired = ceil(0.75 x 50,000) = 37,500,
+    // under the upper bound 90,000 - 50,000 - 2,048.
+    const backend = engineWith(ctxWithGeometry({ contextWindow: 90000, maxTokens: 15000 }))
+    await backend.summarize({ messages: prefillOf(50000) }, 'agent', undefined)
+    assert.deepEqual(seen, [37500])
+    // The swap rebuilds from the row base each call: the next small prefill
+    // returns to the floor (max(row 24,576, line 15,000)), no ratchet.
+    await backend.summarize({ messages: prefillOf(10) }, 'agent', undefined)
+    assert.deepEqual(seen[1], 24576)
+  } finally {
+    BasicCompactionEngine.prototype.summarize = original
+  }
+})
+
+test('backend: the cap floor follows the line cap when the line allows more (the wire raise, as a floor)', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.summarize = async function () { seen.push(this.config.maxTokens); return { blocks: [] } }
+    // The production line (262,144 / 41,943) with a small prefill: the floor
+    // is max(row 24,576, line 41,943) = 41,943 - what the wire's max() raise
+    // sends today, now visible to the geometry check.
+    const backend = engineWith(ctxWithGeometry({ contextWindow: 262144, maxTokens: 41943 }))
+    await backend.summarize({ messages: prefillOf(100) }, 'agent', undefined)
+    assert.deepEqual(seen, [41943])
+  } finally {
+    BasicCompactionEngine.prototype.summarize = original
+  }
+})
+
+test('backend: a geometrically hopeless prefill is refused before the call', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  let called = 0
+  try {
+    BasicCompactionEngine.prototype.summarize = async function () { called += 1; return { blocks: [] } }
+    // 90,000 line with an 80,000-token prefill: upper = 7,952 < floor 24,576.
+    const backend = engineWith(ctxWithGeometry({ contextWindow: 90000, maxTokens: 15000 }))
+    await assert.rejects(
+      () => backend.summarize({ messages: prefillOf(80000) }, 'agent', undefined),
+      /compaction refused before the call.*needs at least 24576/s,
+    )
+    assert.equal(called, 0)
+  } finally {
+    BasicCompactionEngine.prototype.summarize = original
+  }
+})
+
+test('backend: summarize.capRatio comes from the knobs', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  const seen = []
+  const envName = 'DSH_QWEN38_SUMMARIZE_CAP_RATIO'
+  const envBackup = process.env[envName]
+  try {
+    BasicCompactionEngine.prototype.summarize = async function () { seen.push(this.config.maxTokens); return { blocks: [] } }
+    // Same 30,000-token prefill on the 90,000 line: at the 0.75 default the
+    // desired (22,500) stays under the floor, so the row cap stands...
+    delete process.env[envName]
+    const backend = engineWith(ctxWithGeometry({ contextWindow: 90000, maxTokens: 15000 }))
+    await backend.summarize({ messages: prefillOf(30000) }, 'agent', undefined)
+    // ...and at 1.2 the same prefill asks for ceil(1.2 x 30,000) = 36,000.
+    process.env[envName] = '1.2'
+    await backend.summarize({ messages: prefillOf(30000) }, 'agent', undefined)
+    // A malformed value falls back to the default, never to a wild cap.
+    process.env[envName] = '99'
+    await backend.summarize({ messages: prefillOf(30000) }, 'agent', undefined)
+    assert.deepEqual(seen, [24576, 36000, 24576])
+  } finally {
+    if (envBackup === undefined) delete process.env[envName]
+    else process.env[envName] = envBackup
+    BasicCompactionEngine.prototype.summarize = original
+  }
+})
+
+test('backend: without a resolvable geometry the pinned row cap stands unchanged', async () => {
+  const original = BasicCompactionEngine.prototype.summarize
+  const seen = []
+  try {
+    BasicCompactionEngine.prototype.summarize = async function () { seen.push(this.config.maxTokens); return { blocks: [] } }
+    const backend = engineWith(ctxWithGeometry({}))
+    await backend.summarize({ messages: prefillOf(50000) }, 'agent', undefined)
+    assert.deepEqual(seen, [24576])
+  } finally {
+    BasicCompactionEngine.prototype.summarize = original
+  }
+})
+
 test('backend: summarize trims the region, then delegates to the stock path', async () => {
   const original = BasicCompactionEngine.prototype.summarize
   const calls = []

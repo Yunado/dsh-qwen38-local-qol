@@ -88,7 +88,9 @@
                   # Stock default 65536 clamps the trigger to W-O-B and nullifies
                   # thresholdRatio on local windows (upstream discussion 8079).
                   # 0 restores the 0.8 ratio as the trigger; maxTokens above must
-                  # stay explicit because its default follows headroom.
+                  # stay explicit because its default follows headroom: it is a
+                  # FLOOR under the v0.3.7 adaptive cap, standing alone only when no
+                  # line geometry resolves.
                   headroomTokens: 0
               - id: command-compact
                 name: '@deepseek-ai/dsh-command-compact'

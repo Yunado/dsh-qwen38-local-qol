@@ -15,20 +15,20 @@ A QoL plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harn
 ## Install
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.6
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.7
 ```
 
 Recommended: pin a release tag (newest tag listed on [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)); drop the `#tag` fragment to track `main`, the bleeding edge.
 
 Restart `dsh web`: the plugin's bundle patch **declares** the **`qwen38`** agent preset (full roster with the qol compaction backend) and points the profile default at it when no default is configured - nothing is generated on disk at boot. New sessions use it automatically; existing sessions keep the preset they were created with.
 
-You can also pin a specific release: add a tag to the spec (`#v0.3.6` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
+You can also pin a specific release: add a tag to the spec (`#v0.3.7` or any past release). See [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases) for what each tag pins and how to upgrade from it. Pinning a tag is the recommended setup - `main` is the bleeding edge (unreleased fixes and experiments land there first); move off a tag only when you actually want the newest changes.
 
 ## DSH compatibility
 
 | DSH host | Plugin | Status |
 |---|---|---|
-| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.6` | tested (production, first on `#v0.3.4`); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
+| 0.2.2-alpha.2 and newer (production runs 0.2.2-alpha.2) | `#v0.3.7` | tested (production, first on `#v0.3.4`); v0.3.3 and older presets fail to mount there: upstream merged `list_agents` into the control plugin and dropped the `@deepseek-ai/dsh-tool-subagent-control/list-agents` export the qwen38 roster row referenced
 | 0.2.1-alpha.1 - 0.2.2-alpha.1 (production ran 0.2.1-rc.2) | `#v0.3.3` | tested (production, 0.2.1-alpha.1 and 0.2.1-rc.2); older plugin tags fail every turn there, the host removed the built-in `{{cwd}}` prompt variable |
 | 0.2.0-rc.2 | `#v0.3.2` or `#v0.3.3` | tested (production); v0.3.3 only removes content on top, no new host requirements |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | should work - same seam batch, not exercised |
@@ -42,7 +42,7 @@ Upgrading from v0.2.0 (host first, then plugin):
 # 1) update the DSH host to 0.2.0-rc.2 or newer (normal host update).
 # 2) re-pin the plugin (profile dir; Windows: %USERPROFILE%\.dsh\profiles\web):
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.6'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.7'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (superseded, inert)
 # 3) restart dsh web. Sessions already on qwen38 keep working (same id, new
@@ -57,7 +57,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # optional: old boot-generated preset (su
 ## What it supports
 
 - **Per-request thinking budgets.** The llama.cpp line sends the selected per-effort budget on every request (`reasoning_effort` + `reasoning_budget_tokens`, overrides the server's `--reasoning-budget`); the NInfer engine reads its single thinking budget from the server startup flag (`--default-thinking-budget`); the settings tab shows that as a note on the NInfer line (no input), while `defaultThinkingBudget` stays valid as a headless/env config field; the TabbyAPI line accepts both natively; the oMLX line (Apple Silicon MLX) accepts native top-level `thinking_budget` and `chat_template_kwargs.enable_thinking`, so per-effort budgets ride every request.
-- **A compaction backend.** The summarizer's prefill is trimmed (recent reasoning only, images downgraded to text placeholders, tool results capped), and compaction calls run thinking-off at the line's full output cap, so checkpoints stop getting truncated at the token cap. The trigger point is a live slider in the settings tab (default 80% of the window).
+- **A compaction backend.** The summarizer's prefill is trimmed (recent reasoning only, images downgraded to text placeholders, tool results capped), and each compaction call's output cap is derived per call from the trimmed prefill and the active line's window (never below the line's full output cap, raised when the window affords it, and a prefill that cannot fit either is refused before the call with the geometry numbers named), running thinking-off. Checkpoints stop getting truncated at the token cap on small windows, and a geometrically hopeless summary run is never started. The trigger point is a live slider in the settings tab (default 80% of the window).
 - **Vision in tool results.** Image blocks nested in tool results (for example `read_image` output) ride the wire instead of being dropped: a resolved image travels inside a multimodal tool message (a content array with an `image_url` entry); an unreadable one degrades to the same text placeholder as the user side, so the model sees that an image was there but its pixels were not.
 - **A settings tab** that configures all lines, live.
 
@@ -79,7 +79,7 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 | Dialect | `dialect` (`DSH_QWEN38_DIALECT`) | `llamacpp` (options: `ninfer`, `tabbyapi`, `omlx`) |
 | Window | `contextWindow`, `maxTokens` (`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`) | `131072`, `16384` (starter defaults every local server can host; raise them to your server's real context, and keep the tab at or below what the server was started with) |
 | Thinking | `thinkingBudgets` (llamacpp + tabbyapi + omlx, per effort), `defaultThinkingBudget` (the declared server thinking ceiling; the tab shows it on the ninfer line only — enter the server's `--default-thinking-budget` value there, the plugin cannot read the startup flag), `defaultEffort` (`DSH_QWEN38_DEFAULT_EFFORT`) | `{ low: 2048, medium: 4096, xhigh: 8192 }`, `8192`, `medium` |
-| Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS` (env only) | `strip`, `5`, `2000` |
+| Prefill trim | `DSH_QWEN38_SUMMARIZE_IMAGES`, `DSH_QWEN38_SUMMARIZE_KEEP_TURNS`, `DSH_QWEN38_SUMMARIZE_TOOL_CHARS`, `DSH_QWEN38_SUMMARIZE_CAP_RATIO` (env only) | `strip`, `5`, `2000`, `0.75` |
 | Compaction trigger | `compactThresholdPct` (the tab slider, per-line memory) | `80` (fires at exactly that percent of the window; lines never moved keep the top-level value, moved lines store their own; the slider syncs the output cap to keep the point reachable) |
 
 ### Settings & Fields Explained
@@ -109,12 +109,13 @@ The settings tab is the primary entry; headless profiles and patch/env accept th
 
 #### 4. History Compaction & Trimming
 When conversations approach the context window limit, Harness compresses older history into summaries:
-- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The percent is a line field: each server line remembers its own slider position (moved from its tab, saved into its `lines` block), and the active line's value is mirrored to the top level where the compaction backend reads it. A line without its own percent inherits the top-level one, so profiles from the single-global-percent era keep their setting untouched. The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must stay strictly below the output cap; the tab refuses the save otherwise. Current usage lives in the chat page's top meter.
+- **Compaction trigger point (`compactThresholdPct`)**: where automatic compaction fires, at exactly this percent of the context window (slider default 80). The percent is a line field: each server line remembers its own slider position (moved from its tab, saved into its `lines` block), and the active line's value is mirrored to the top level where the compaction backend reads it. A line without its own percent inherits the top-level one, so profiles from the single-global-percent era keep their setting untouched. The tab slider (50..90 band) is hot, landing on the next session step without a restart. The slider also syncs the output cap in both directions to the largest value that keeps the point reachable under the wall guard (a quarter of the cap): dragging the slider rewrites the cap so every percent is an exact trigger point (the token point shows beside the label). If a point would need the cap below what your thinking budgets require, the cap parks at that floor, a red checker names the cap the point needs, and saving stays refused until you lower a thinking budget by hand. Every thinking budget (low/medium/xhigh and the default) must keep at least 8,192 tokens of the output cap free for the visible answer; the tab shows the per-effort answer room under the budget fields and refuses the save otherwise. Compaction calls do not crowd that room: their caps are derived per call from the window. Current usage lives in the chat page's top meter.
 - **Summarize Images (`summarize.images`)**:
   - `strip` (recommended): Replaces older images with brief text placeholders to save significant context space.
   - `keep`: Preserves past images in memory.
 - **Keep Recent Reasoning (`summarize.keepTurns`)**: How many recent assistant turns retain their full thought logs (`<think>`). Older turns have their thoughts trimmed because previous reasoning is rarely needed once an action has succeeded. `0` strips reasoning from every turn.
 - **Cap Tool Output (`summarize.toolChars`)**: Maximum character length kept for bulky command outputs or file reads in compacted history (default: 2,000 characters). Prevents giant terminal logs from flooding the context window. `0` turns the cap off.
+- **Summary Cap Ratio (`summarize.capRatio`)**: The checkpoint-to-prefill ratio the per-call summary cap reserves (default: 0.75, allowed 0.1..2; see the compaction backend above). Not exposed in the settings tab: a patch/env field for models whose checkpoints run unusually verbose or terse.
 
 #### 5. Per-Line Memory
 The settings tab keeps independent settings for each dialect (`llamacpp`, `omlx`, `ninfer`, `tabbyapi`). Switching between server buttons automatically restores each server's specific port, model alias, and context size without re-entering them.
@@ -167,20 +168,20 @@ Host half = plain ESM JavaScript with JSDoc; the browser half is built by `scrip
 ## 安装
 
 ```sh
-dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.6
+dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.7
 ```
 
 推荐钉 release tag（最新 tag 见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)）；去掉 `#tag` 即跟随前沿线 `main`。
 
 重启 `dsh web`：插件的 bundle patch **声明**了 **`qwen38`** agent preset（完整 roster + qol 压缩后端），未配置默认时把 profile 默认指向它 —— boot 期间不写盘生成任何东西。新会话自动使用；已有会话保留创建时的 preset。
 
-也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.6` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
+也可以钉住某个具体 release：在 spec 里加 tag（`#v0.3.7` 或任意历史 tag）。每个 tag 钉住什么、之后怎么升，见 [Releases](https://github.com/Yunado/dsh-qwen38-local-qol/releases)。推荐钉 tag：`main` 是前沿线（未发布的修复和实验先进 main），确有需求再离开 tag。
 
 ## DSH 兼容性
 
 | DSH 宿主 | 插件版本 | 状态 |
 |---|---|---|
-| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.6` | 实测通过（生产，先跑 `#v0.3.4`）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
+| 0.2.2-alpha.2 起（生产实跑 0.2.2-alpha.2） | `#v0.3.7` | 实测通过（生产，先跑 `#v0.3.4`）；v0.3.3 及更老的 preset 在该宿主上挂载失败：上游把 `list_agents` 并入 control 主插件并删除了 qwen38 名册引用的 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 导出
 | 0.2.1-alpha.1 - 0.2.2-alpha.1（生产曾实跑 0.2.1-rc.2） | `#v0.3.3` | 实测通过（生产，0.2.1-alpha.1 与 0.2.1-rc.2）；更老的插件 tag 在该宿主上每轮必炸（上游移除了内置 `{{cwd}}` 提示词变量） |
 | 0.2.0-rc.2 | `#v0.3.2` 或 `#v0.3.3` | 实测通过（生产）；v0.3.3 在其上只做减法，不要求宿主新功能 |
 | 0.1.7-alpha.1 - 0.2.0-rc.1 | `#v0.3.3` | 应可用 - 同一批缝，未实测 |
@@ -194,7 +195,7 @@ dsh plugin --profile web add github:Yunado/dsh-qwen38-local-qol#v0.3.6
 # 1) 先把 DSH 宿主升到 0.2.0-rc.2 或更新（正常宿主更新）。
 # 2) 重钉插件（profile 目录；Windows：%USERPROFILE%\.dsh\profiles\web）：
 cd ~/.dsh/profiles/web
-npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.6'
+npm pkg set 'dependencies.dsh-qwen38-local-qol=github:Yunado/dsh-qwen38-local-qol#v0.3.7'
 pnpm install
 rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（已被取代，惰性）
 # 3) 重启 dsh web。已在用 qwen38 的会话无缝继续（同 id、新声明接管）。
@@ -208,7 +209,7 @@ rm -rf ~/.dsh/.agent-presets/qwen38    # 可选：旧 boot 生成的 preset（�
 ## 功能特性
 
 - **逐请求 thinking 预算。** llama.cpp 线每请求发送所选 effort 的预算（`reasoning_effort` + `reasoning_budget_tokens`，覆盖服务端 `--reasoning-budget`）；NInfer 引擎的 thinking 预算由服务端启动参数（`--default-thinking-budget`）决定；设置 tab 在 NInfer 线只显示说明（无输入），`defaultThinkingBudget` 字段保留为 headless/env 配置项；TabbyAPI 线两者都原生接受；oMLX 线（Apple Silicon MLX）原生接受顶层 `thinking_budget` 与 `chat_template_kwargs.enable_thinking`，逐请求按档发送。
-- **压缩（compaction）后端。** 摘要 prefill 先裁剪（只留近 N 轮 reasoning、图片降为文本占位符、工具结果按字数帽截断），且压缩调用强制 thinking off + 该线完整输出帽，checkpoint 不再被 token 帽截断。触发点是设置页的实时滑杆（默认窗口的 80%）。
+- **压缩（compaction）后端。** 摘要 prefill 先裁剪（只留近 N 轮 reasoning、图片降为文本占位符、工具结果按字数帽截断），每次压缩调用的输出帽按"裁剪后的 prefill + 当前线窗口"逐次推导（不低于该线完整输出帽，窗口允许则上调；两头都装不下的 prefill 在调用前就带着几何数字被拒绝），且强制 thinking off；小窗口下 checkpoint 不再被 token 帽截断，注定跑不完的摘要也不会白跑。触发点是设置页的实时滑杆（默认窗口的 80%）。
 - **工具结果里的图片不再丢弃。** 嵌套在 tool-result 内的 image block（如 `read_image` 的结果）现在会上线：attachment 能解出 data URL 时，图以多模态 tool 消息（content 数组 + `image_url` 条目）发送；读不出来时用与用户侧相同的文本占位符，模型知道"这里有张图但看不见像素"。
 - **设置 tab**：图形化配置四条服务线，即时生效。
 
@@ -230,7 +231,7 @@ DSH 设置 → **Qwen3.8 本地**：
 | 方言 | `dialect`（`DSH_QWEN38_DIALECT`） | `llamacpp`（可选：`ninfer`、`tabbyapi`、`omlx`） |
 | 窗口 | `contextWindow`、`maxTokens`（`DSH_QWEN38_CONTEXT_WINDOW` / `_MAX_TOKENS`） | `131072`、`16384`（新装起步值，任何本地服务都扛得住；请按服务的真实上下文调大，且设置页不得超过服务启动时设定的上限） |
 | Thinking | `thinkingBudgets`（llamacpp + tabbyapi + omlx，按 effort）、`defaultThinkingBudget`（申报的服务端 thinking 上限；设置页仅在 ninfer 线显示这一格——把服务启动参数 `--default-thinking-budget` 的值填在这里，插件读不到启动参数）、`defaultEffort`（`DSH_QWEN38_DEFAULT_EFFORT`） | `{ low: 2048, medium: 4096, xhigh: 8192 }`、`8192`、`medium` |
-| Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`（仅环境变量） | `strip`、`5`、`2000` |
+| Prefill 裁剪 | `DSH_QWEN38_SUMMARIZE_IMAGES`、`DSH_QWEN38_SUMMARIZE_KEEP_TURNS`、`DSH_QWEN38_SUMMARIZE_TOOL_CHARS`、`DSH_QWEN38_SUMMARIZE_CAP_RATIO`（仅环境变量） | `strip`、`5`、`2000`、`0.75` |
 | 压缩触发 | `compactThresholdPct`（tab 滑杆，随线记忆） | `80`（触发点 = 该百分比 × 窗口；未单独调过滑杆的线继承顶层值，调过则各线各存；滑杆双向联动输出上限，保证该点精确落地） |
 
 ### 设置项与字段说明
@@ -260,12 +261,13 @@ DSH 设置 → **Qwen3.8 本地**：
 
 #### 4. 历史压缩与裁剪（Compaction）
 当会话过长接近上下文上限时，Harness 会将较早的历史压缩成摘要：
-- **压缩触发点（`compactThresholdPct`）**：自动压缩恰在窗口的该百分比处触发（滑杆默认 80）。设置页滑杆（50–90 区间）改完即生效、无需重启，落在下一个会话步骤；滑杆同时双向联动输出上限——拖动即重写该帽到"保证该点可落地的最大值"（墙护=帽的 1/4），于是每一格都是精确的真实触发点（标签旁显示对应的 token 点）。若某点所需的帽会低于 thinking 预算所需的容量，帽停在该底线、红字 checker 点出该点需要的帽值，保存被拦，直到手动调低某档预算。每档 thinking 预算（低/中/超高）与默认预算必须严格小于输出上限，否则设置页拒绝保存。当前用量看聊天页顶部的上下文计量。
+- **压缩触发点（`compactThresholdPct`）**：自动压缩恰在窗口的该百分比处触发（滑杆默认 80）。设置页滑杆（50–90 区间）改完即生效、无需重启，落在下一个会话步骤；滑杆同时双向联动输出上限——拖动即重写该帽到"保证该点可落地的最大值"（墙护=帽的 1/4），于是每一格都是精确的真实触发点（标签旁显示对应的 token 点）。若某点所需的帽会低于 thinking 预算所需的容量，帽停在该底线、红字 checker 点出该点需要的帽值，保存被拦，直到手动调低某档预算。每档 thinking 预算（低/中/超高）与默认预算必须给正文在输出上限内留出至少 8192 token；设置页在预算输入下方实时显示各档正文可写的空间，不满足则拒绝保存（与服务端写入护栏同源）。压缩调用不受此挤占：其帽按窗口逐次推导。当前用量看聊天页顶部的上下文计量。
 - **图片处理（`summarize.images`）**：
   - `strip`（推荐）：在旧轮次中移除大图并替换为简短占位文本，大幅节省上下文空间。
   - `keep`：在历史中保留原图。
 - **保留近期思考（`summarize.keepTurns`）**：压缩时保留最近多少轮助手的完整 `<think>` 思考过程（默认 5 轮）。更早轮次的思考过程会被裁掉（通常只需最终操作结果，无需保留早期心路历程）。填 `0` = 全部剥离。
 - **工具输出截断（`summarize.toolChars`）**：历史中单次工具输出（如大段终端日志或文件读取）保留的最大字符数（默认 2000 字），防止巨量日志挤占宝贵的上下文。填 `0` = 关闭截断。
+- **摘要帽比例（`summarize.capRatio`）**：逐次推导摘要输出帽时预留的"checkpoint/prefill"比例（默认 0.75，允许 0.1~2，见上文压缩后端）。设置页不提供输入：这是给 checkpoint 异常冗长或简短的模型留的 patch/环境变量字段。
 
 #### 5. 按线独立记忆
 设置 tab 为每种方言（`llamacpp`、`omlx`、`ninfer`、`tabbyapi`）保留独立的配置记忆。切换方言单选框会自动恢复该服务线的地址、模型名与窗口大小，无需反复重新填写。
